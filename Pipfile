@@ -1,0 +1,25 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+bump2version = "*"
+wheel = "*"
+watchdog = "*"
+pylint = "*"
+flake8 = "*"
+pdbpp = "*"
+tox = "*"
+coverage = "*"
+Sphinx = "*"
+twine = "*"
+
+[packages]
+Click = "*"
+python-dotenv = "*"
+thought = {editable = true, path = "."}
+notion = "*"
+
+[requires]
+python_version = "3.7"
