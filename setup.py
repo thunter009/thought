@@ -34,7 +34,7 @@ setup(
     description="Notion CLI using notion-py library and Click",
     entry_points={
         'console_scripts': [
-            'thought=thought.cli:main',
+            'thought=thought.cli:cli',
         ],
     },
     install_requires=requirements,

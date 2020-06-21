@@ -1,10 +1,16 @@
 """Console script for thought."""
-import sys
-import click
-
-
 import logging
-from thought.settings import LOGGING_DATE_FORMAT, LOGGING_FORMAT, LOGGING_PATH
+import sys
+
+import click
+from thought.client import NotionAPI
+from thought.settings import (
+    LOGGING_DATE_FORMAT,
+    LOGGING_FORMAT,
+    LOGGING_PATH
+)
+
+
 
 FILE_NAME = __name__
 logging.basicConfig(level=logging.INFO,
@@ -18,16 +24,36 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 logger = logging.getLogger()
+class Config:
+    """Configuration Object"""
+CONTEXT = click.make_pass_decorator(Config, ensure=True)
 
 
-@click.command()
-def main(args=None):
-    """Console script for thought."""
-    click.echo("Replace this message by putting your code into "
-               "thought.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
-    return 0
+@click.group()
+@CONTEXT
+def cli(ctx):
+    '''
+        Thought - A Notion CLI
+    '''
+
+@cli.command('dedupe')
+@click.argument('collection')
+@CONTEXT
+def dedupe(ctx,
+           collection):
+    '''
+        Removes dupelicate items in a specified collection view
+
+        Arguments
+        ------
+
+        collection: A URL to a collection view
+    '''
+    client = NotionAPI().client
+    col_view = client.get_collection_view(collection)
+    import ipdb; ipdb.set_trace()
+    pass
 
 
 if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+    sys.exit(cli())  # pragma: no cover
