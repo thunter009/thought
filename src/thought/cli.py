@@ -3,6 +3,7 @@ import logging
 import sys
 
 import click
+from thought.core import CollectionExtension
 from thought.client import NotionAPI
 from thought.settings import (
     LOGGING_DATE_FORMAT,
@@ -38,9 +39,11 @@ def cli(ctx):
 
 @cli.command('dedupe')
 @click.argument('collection')
+@click.option('-f', '--field', multiple=True, help='Deduplication field')
 @CONTEXT
 def dedupe(ctx,
-           collection):
+           collection,
+           field):
     '''
         Removes dupelicate items in a specified collection view
 
@@ -51,8 +54,10 @@ def dedupe(ctx,
     '''
     client = NotionAPI().client
     col_view = client.get_collection_view(collection)
+    collection = CollectionExtension(col_view.collection)
+    output = collection.dedupe(comparison_fields=list(field)) if field else collection.dedupe()
     import ipdb; ipdb.set_trace()
-    pass
+    click.echo(output)
 
 
 if __name__ == "__main__":

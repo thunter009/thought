@@ -15,12 +15,15 @@ coverage = "*"
 Sphinx = "*"
 twine = "*"
 ipdb = "*"
+autopep8 = "*"
 
 [packages]
 Click = "*"
 python-dotenv = "*"
 thought = {editable = true, path = "."}
 notion = "*"
+pandas = "*"
+recordlinkage = "*"
 
 [requires]
 python_version = "3.7"
