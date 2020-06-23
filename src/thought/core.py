@@ -77,7 +77,7 @@ class CollectionExtension:
     
     def asdataframe(self) -> pd.DataFrame:
         '''
-            Returns a Collection's Block rows as a pandas data frame using the get_all_properties function. Collapse's objects to id + object slug
+            Returns a Collection's Block rows as a pandas data frame using the get_all_properties function.
         '''
         holder = []
         rows = self.collection.get_rows()
