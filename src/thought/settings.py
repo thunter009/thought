@@ -11,3 +11,20 @@ LOGGING_PATH = '.'
 
 # general settings
 NOTION_ACCESS_TOKEN = os.getenv("NOTION_ACCESS_TOKEN")
+NOTION_SERVICES_DIRECTORY = "Services-Data-a522a4f6eb294d529c6496136b1a4290"
+class placeholder:
+    pass
+
+# data source providers / register external services here
+SERVICES_REGISTERED = {
+    'instapaper': 'InstapaperAPI'
+}
+SERVICES_CONFIGURATION_PATH = ['services']
+
+# instapaper settings
+INSTAPAPER_BASE_URL = 'https://www.instapaper.com/api'
+INSTAPAPER_BOOKMARKS_DIRECTORY = 'archive'
+INSTAPAPER_CONSUMER_ID = os.getenv("INSTAPAPER_CONSUMER_ID") 
+INSTAPAPER_CONSUMER_SECRET = os.getenv("INSTAPAPER_CONSUMER_SECRET") 
+INSTAPAPER_USER = os.getenv("INSTAPAPER_USER") 
+INSTAPAPER_PASS = os.getenv("INSTAPAPER_PASS")

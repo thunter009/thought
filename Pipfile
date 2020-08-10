@@ -24,6 +24,9 @@ thought = {editable = true, path = "."}
 notion = "*"
 pandas = "*"
 recordlinkage = "*"
+requests-oauthlib = "*"
+pytoml = "*"
+requests = "*"
 
 [requires]
 python_version = "3.7"
