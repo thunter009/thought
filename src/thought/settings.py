@@ -11,9 +11,8 @@ LOGGING_PATH = '.'
 
 # general settings
 NOTION_ACCESS_TOKEN = os.getenv("NOTION_ACCESS_TOKEN")
-NOTION_SERVICES_DIRECTORY = "Services-Data-a522a4f6eb294d529c6496136b1a4290"
-class placeholder:
-    pass
+NOTION_SERVICES_DIRECTORY = "https://www.notion.so/Services-008f866a7d564af6ad9e49cd8368788b"
+
 
 # data source providers / register external services here
 SERVICES_REGISTERED = {

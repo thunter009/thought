@@ -17,6 +17,12 @@ from thought.settings import (
 from thought.utils import default_field
 
 
+# CONSTANTS SPECIFIC TO THIS SERVICE
+AUTH_MODE = 'client_auth'
+ENDPOINT_ALL_BOOKMARKS = 'bookmarks/list'
+ENDPOINT_AUTH = 'oauth/access_token'
+
+
 @dataclass
 class InstapaperAPI(APIService):
     """
@@ -24,9 +30,6 @@ class InstapaperAPI(APIService):
     """
     _base_url: str = default_field(INSTAPAPER_BASE_URL, init=False, repr=False)
     _api_version: float = default_field(1, init=False, repr=False)
-    
-    CLIENT_KEY: str = default_field(INSTAPAPER_CONSUMER_ID, init=False, repr=False)
-    CLIENT_SECRET: str = default_field(INSTAPAPER_CONSUMER_SECRET, init=False, repr=False)
 
     def __post_init__(self):
         self.authorize()
@@ -39,15 +42,29 @@ class InstapaperAPI(APIService):
         return {
             'x_auth_username': INSTAPAPER_USER, 
             'x_auth_password': INSTAPAPER_PASS, 
-            'x_auth_mode': 'client_auth'
+            'x_auth_mode': AUTH_MODE
         }
 
-    def bookmarks_all(self, folder: str) -> pd.DataFrame:
-        import ipdb; ipdb.set_trace()
-        pass
+    def bookmarks(self, folder: str) -> pd.DataFrame:
+        suffix = ENDPOINT_ALL_BOOKMARKS
+        url = self._concate_url_from_parts(suffix)
+        response = self.client.get(url, params={'folder_id': folder})
 
-    def _download_all_bookmark_highlights(self, bookmarks: str) -> pd.DataFrame:
-        pass
+        # filter out account info & metadata
+        metadata_keys = {'type'}
+        account_keys = {
+            'username',
+            'user_id',
+            'type',
+            'subscription_is_active'
+        }
+        holder = []
+        for line in response.json():
+            line_keys = set(line.keys())
+            if line_keys == metadata_keys or line_keys == account_keys:
+                continue
+            holder.append(line)
+        return pd.DataFrame(holder)
     
     def authorize(self) -> None:
         '''
@@ -55,28 +72,14 @@ class InstapaperAPI(APIService):
 
             Since this is just my personal account this is a simple oauth implmentation
         '''
-        auth_suffix = 'oauth/access_token'
+        auth_suffix = ENDPOINT_AUTH
         auth_token_url = self._concate_url_from_parts(auth_suffix)
-        session = OAuth1Session(self.CLIENT_KEY, client_secret=self.CLIENT_SECRET)
+        session = OAuth1Session(INSTAPAPER_CONSUMER_ID,
+                                client_secret=INSTAPAPER_CONSUMER_SECRET)
         params = self._build_auth_params()
         credentials = session.fetch_request_token(auth_token_url, params=params)
 
         if not session.authorized:
             raise CredentialsNotAuthorizedException("Not properly authorized, try again")
-            import ipdb; ipdb.set_trace()
 
         self.client = session
-    
-    # def download(self, folder: str, include_highlights: bool = True) -> Dict[str, pd.DataFrame]:
-    #     '''
-    #         Downloads all instapaper bookmarks found in the supplied 'folder' parameter.
-
-    #         If `include_highlights` is True then bookmark highlights will also be downloaded
-
-    #     '''        
-    #     # download all bookmarks
-    #     bookmarks = self.bookmarks_all(folder)
-
-    #     if include_highlights:
-    #         # download all highlights for retrieved bookmarks
-    #         self._download_all_bookmark_highlights(bookmarks)

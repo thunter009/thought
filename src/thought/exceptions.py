@@ -3,3 +3,9 @@ class ServiceNotRegisteredException(BaseException):
 
 class CredentialsNotAuthorizedException(BaseException):
     pass
+
+class LoadDestinationNotUniqueException(BaseException):
+    pass
+
+class CollectionMustAlreadyExistException(BaseException):
+    pass

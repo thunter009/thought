@@ -14,9 +14,7 @@ Thought
         :alt: Documentation Status
 
 
-
-
-Notion CLI using notion-py library and Click
+Notion CLI using Notion's API via `notion-sdk-py<https://github.com/ramnes/notion-sdk-py>` and Click
 
 
 * Free software: MIT license
