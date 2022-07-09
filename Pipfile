@@ -15,6 +15,7 @@ coverage = "*"
 Sphinx = "*"
 twine = "*"
 autopep8 = "*"
+ipykernel = "*"
 
 [packages]
 Click = "*"
@@ -26,6 +27,7 @@ recordlinkage = "*"
 requests-oauthlib = "*"
 pytoml = "*"
 requests = "*"
+notion-client = "*"
 
 [requires]
 python_version = "3.9"

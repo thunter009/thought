@@ -4,7 +4,7 @@ import sys
 
 import click
 
-from thought.client import NotionAPI
+from thought.client import NotionAPIClient
 from thought.core import CollectionExtension, CollectionViewExtension, Output
 from thought.exceptions import (
     CollectionMustAlreadyExistException,
@@ -49,11 +49,11 @@ CONTEXT = click.make_pass_decorator(Config, ensure=True)
 def cli(ctx,
         service_config_directory):
     '''
-        Thought - A Notion CLI
+        Thought - Notion CLI
     '''
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
-    ctx.client = NotionAPI().client
+    ctx.client = NotionAPIClient().client
 
 
 @cli.command('dedupe')
@@ -157,6 +157,7 @@ def sync(ctx,
         logging.INFO("%s action not defined for specified service. Please refer to docs.".format(action))
 
     data = service_instance.call(action, folder='archive') #TODO: onboard arbitrary key: values from click options here
+    breakpoint()
     
     page = client.get_block(target_collection)
     collection_name = f'{service}_{action}'
@@ -174,7 +175,6 @@ def sync(ctx,
     # drop to base object since we're confident this list should only contain 1 object
     collection = collection[0].collection
     service_instance.load(data, collection)
-    breakpoint()
 
 
 if __name__ == "__main__":

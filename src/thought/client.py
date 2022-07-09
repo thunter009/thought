@@ -1,23 +1,19 @@
 import os
+from dataclasses import dataclass
 
-from notion.client import NotionClient
+# from notion.client import NotionClient
+from notion_client import Client as NotionClient
+
 from thought.settings import NOTION_ACCESS_TOKEN
+from thought.utils import default_field
 
 
-def get_client(token):
-    return NotionClient(token_v2=token)
+def get_client(token=NOTION_ACCESS_TOKEN):
+    return NotionClient(auth=token)
 
-
-class NotionAPI:
+@dataclass
+class NotionAPIClient:
     """
-    Notion Client object
+    Notion API Client wrapper object
     """
-    token: str = NOTION_ACCESS_TOKEN
-    client: NotionClient = None
-
-    def __init__(self):
-        if self.token is None:
-            self.token = NOTION_ACCESS_TOKEN
-
-        if self.client is None:
-            self.client = get_client(self.token)
+    client: NotionClient = default_field(get_client())
