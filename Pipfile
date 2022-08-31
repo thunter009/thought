@@ -20,7 +20,6 @@ ipykernel = "*"
 [packages]
 Click = "*"
 python-dotenv = "*"
-thought = {editable = true, path = "."}
 notion = "*"
 pandas = "*"
 recordlinkage = "*"
@@ -28,6 +27,8 @@ requests-oauthlib = "*"
 pytoml = "*"
 requests = "*"
 notion-client = "*"
+thought = {editable = true, path = "."}
+regex = "*"
 
 [requires]
 python_version = "3.9"

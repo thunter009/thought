@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass
 
-# from notion.client import NotionClient
 from notion_client import Client as NotionClient
 
 from thought.settings import NOTION_ACCESS_TOKEN

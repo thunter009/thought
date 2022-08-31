@@ -1,8 +1,11 @@
-"""Console script for thought."""
 import logging
+import pprint
 import sys
+from email.policy import default
+from pathlib import Path
 
 import click
+import pandas as pd
 
 from thought.client import NotionAPIClient
 from thought.core import CollectionExtension, CollectionViewExtension, Output
@@ -18,6 +21,11 @@ from thought.settings import (
     LOGGING_PATH,
     NOTION_SERVICES_DIRECTORY,
     SERVICES_CONFIGURATION_PATH,
+)
+from thought.utils import (
+    notion_clean_column_name,
+    notion_rich_text_to_plain_text,
+    notion_url_to_uuid,
 )
 
 FILE_NAME = __name__
@@ -175,6 +183,94 @@ def sync(ctx,
     # drop to base object since we're confident this list should only contain 1 object
     collection = collection[0].collection
     service_instance.load(data, collection)
+
+@cli.command('tojson')
+@click.argument('database_url')
+@click.option('-o', '--output', "_output", 
+              type=str,
+              help="The output path to save the exported data to",
+              default='.')
+@click.option('-c', '--columns', 
+              type=list,
+              help="The columns to export from the target database",
+              default=['*'])
+@CONTEXT
+def tojson(ctx,
+           database_url: str,
+           _output: str,
+           columns: list
+           ) -> None:
+    '''
+        Exports a database view to JSON records format.
+
+        Arguments
+        ---------
+
+        database_url: The URL to a specific database (or view) you want to export as a JSON records array
+        filter: A JSON object specifying the filter to apply to the database
+
+        Example
+        ---------
+
+        `thought tojson "https://www.notion.so/markerr/8d052cfe70b34827a1a91a2cbf6f0b2c?v=fbd720d747b84e839d35c0894a726ff2"`
+    '''
+    client = ctx.client
+
+    # convert raw URL --> UUID
+    uuid = notion_url_to_uuid(database_url)
+
+    # construct query from CLI parameters
+    query = {
+        'database_id': uuid,
+        'filter': {
+            'property': 'Name',
+            'rich_text': {
+                'contains': 'Test'
+            }
+        }
+    }
+
+    # send query and get back response JSON
+    result = client.databases.query(**query)
+
+    # error handle here
+    
+    # filter down JSON response to export ready object
+    holder = []
+    for r in result['results']:
+        
+        # convert dict to df
+        df = pd.json_normalize(r)
+
+        # select only required columns
+        # TODO: replace with click option parameter
+        input_columns = [
+            'Text',
+            'ThisIsACheckbox'
+        ]
+        
+        # TODO: handle all columns case
+        transformed_input_columns = [x for x in df.columns for y in input_columns if y in x]
+        reduced_columns = [x for x in filter(lambda x: all(['.id' not in x, '.type' not in x]), transformed_input_columns)]
+        df = df[reduced_columns]
+
+        # handle rich_text fields
+        rich_text_columns = [x for x in df.columns if 'rich_text' in x]
+
+        for rt_col in rich_text_columns:
+            df[rt_col] = df[rt_col].apply(lambda x: notion_rich_text_to_plain_text(x))
+
+        # change column names to "pure" column names without notion data structure cruft
+        new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
+        df.rename(columns=new_column_names, inplace=True)
+        
+        holder.append(df)
+        
+
+    # write object to file
+    path = Path(_output) / Path(f'{uuid}.json')
+    df = pd.concat(holder)
+    df.to_json(path, orient='records')
 
 
 if __name__ == "__main__":
