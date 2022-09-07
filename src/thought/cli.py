@@ -219,7 +219,7 @@ def tojson(ctx,
         Example
         ---------
 
-        `thought tojson "https://www.notion.so/markerr/8d052cfe70b34827a1a91a2cbf6f0b2c?v=fbd720d747b84e839d35c0894a726ff2"`
+        `thought tojson "https://www.notion.so/<YOUR ORG>/<DATABASE_ID>?v=<VIEW_ID>"`
     '''
     client = ctx.client
 
