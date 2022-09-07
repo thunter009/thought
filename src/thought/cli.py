@@ -1,5 +1,4 @@
 import logging
-import pprint
 import sys
 from email.policy import default
 from pathlib import Path
@@ -25,7 +24,9 @@ from thought.settings import (
 from thought.utils import (
     notion_clean_column_name,
     notion_rich_text_to_plain_text,
+    notion_select_to_plain_text,
     notion_url_to_uuid,
+    now,
 )
 
 FILE_NAME = __name__
@@ -191,14 +192,20 @@ def sync(ctx,
               help="The output path to save the exported data to",
               default='.')
 @click.option('-c', '--columns', 
-              type=list,
+              type=str,
               help="The columns to export from the target database",
-              default=['*'])
+              multiple=True,
+              default=None)
+@click.option('-f', '--filter', 
+              type=list,
+              help="The filter to apply to the target database",
+              default={})
 @CONTEXT
 def tojson(ctx,
            database_url: str,
            _output: str,
-           columns: list
+           columns: list,
+           filter: dict
            ) -> None:
     '''
         Exports a database view to JSON records format.
@@ -220,20 +227,22 @@ def tojson(ctx,
     uuid = notion_url_to_uuid(database_url)
 
     # construct query from CLI parameters
+    # TODO: pass filters via CLI params
+    
     query = {
-        'database_id': uuid,
-        'filter': {
-            'property': 'Name',
-            'rich_text': {
-                'contains': 'Test'
-            }
-        }
+        'database_id': uuid
+        # 'filter': {
+        #     'property': 'Name',
+        #     'rich_text': {
+        #         'contains': 'Test'
+        #     }
+        # }
     }
 
     # send query and get back response JSON
     result = client.databases.query(**query)
 
-    # error handle here
+    # error handle
     
     # filter down JSON response to export ready object
     holder = []
@@ -241,34 +250,74 @@ def tojson(ctx,
         
         # convert dict to df
         df = pd.json_normalize(r)
-
-        # select only required columns
-        # TODO: replace with click option parameter
-        input_columns = [
-            'Text',
-            'ThisIsACheckbox'
-        ]
         
-        # TODO: handle all columns case
-        transformed_input_columns = [x for x in df.columns for y in input_columns if y in x]
-        reduced_columns = [x for x in filter(lambda x: all(['.id' not in x, '.type' not in x]), transformed_input_columns)]
+        # handle all columns case
+        if len(columns) == 0:
+            transformed_input_columns = list(df.columns)
+        
+        # select only provided columns
+        else:
+            transformed_input_columns = [x for x in df.columns for y in columns if y in x]
+        
+        # TODO: add click option to include title column object + flatten it 
+        reduced_columns = [
+            x for x in transformed_input_columns 
+            if all([
+                '.id' not in x,
+                '.type' not in x,
+                '.color' not in x,
+                'properties.' in x,
+                '.title' not in x
+            ])
+        ]
         df = df[reduced_columns]
 
         # handle rich_text fields
+        # TODO: make this a function
         rich_text_columns = [x for x in df.columns if 'rich_text' in x]
 
-        for rt_col in rich_text_columns:
-            df[rt_col] = df[rt_col].apply(lambda x: notion_rich_text_to_plain_text(x))
+        if rich_text_columns:
+
+            for rt_col in rich_text_columns:
+                df[rt_col] = df[rt_col].apply(notion_rich_text_to_plain_text)
+        
+        # handle tag fields
+        # TODO: make this a function
+        tag_columns = [
+            x for x in df.columns 
+            if any([
+                'multi_select' in x,
+                'select' in x,
+            ])
+        ]
+
+        if tag_columns:
+
+            for col in tag_columns:
+                df[col] = df[col].apply(notion_select_to_plain_text)
+
+        # handle name/id field
+        # TODO: make this a function
+        # formula_columns = [
+        #     x for x in df.columns 
+        #     if any([
+        #         '.formula.' in x,
+        #     ])
+        # ]
+
+        # if formula_columns:
+
+        #     for col in tag_columns:
+        #         df[col] = df[col].apply(notion_select_to_plain_text)
 
         # change column names to "pure" column names without notion data structure cruft
         new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
         df.rename(columns=new_column_names, inplace=True)
-        
         holder.append(df)
-        
+
 
     # write object to file
-    path = Path(_output) / Path(f'{uuid}.json')
+    path = Path(_output) / Path(f'{uuid}-{now()}.json')
     df = pd.concat(holder)
     df.to_json(path, orient='records')
 

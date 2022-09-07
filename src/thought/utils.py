@@ -52,6 +52,18 @@ def notion_rich_text_to_plain_text(rich_text_list: list) -> str:
     for part in rich_text_list:
         holder.append(part['text']['content'])
     return ''.join(holder)
+
+def notion_select_to_plain_text(select_list: list) -> str:
+    """
+    Converts a notion rich_text list into a plain text string
+    """
+    if select_list:
+        holder = []
+        for part in select_list:
+            holder.append(part['name'])
+        return holder
+    
+    return None
         
 def notion_clean_column_name(column_name: str) -> str:
     """
@@ -61,6 +73,12 @@ def notion_clean_column_name(column_name: str) -> str:
     -------
     properties.ThisIsACheckbox.checkbox -> ThisIsACheckbox
     """
-    regex = r'(?<=properties\.)([a-zA-Z_]+)(?=\.[a-zA-Z_]+)'
-    search = re.search(regex, column_name)
-    return search.group() if search else None
+    is_date_regex = r'(?<=properties\.)([a-zA-Z_ ]+\.date\.[a-zA-Z_ ]+)'
+    is_date = re.search(is_date_regex, column_name)
+
+    if is_date:
+        return is_date.group().replace('.date.', '_')
+    else:
+        regex = r'(?<=properties\.)([a-zA-Z_ \u263a-\U0001f645]+)(?=\.[a-zA-Z_.]+)'
+        search = re.search(regex, column_name)
+        return search.group() if search else column_name
