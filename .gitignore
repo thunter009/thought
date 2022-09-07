@@ -105,4 +105,4 @@ ENV/
 .vscode/
 .DS_Store
 
-40d4e41a-255a-4140-ab7b-2da041e953db.json
+*.json
