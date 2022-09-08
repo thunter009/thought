@@ -15,17 +15,20 @@ coverage = "*"
 Sphinx = "*"
 twine = "*"
 autopep8 = "*"
+ipykernel = "*"
 
 [packages]
 Click = "*"
 python-dotenv = "*"
-thought = {editable = true, path = "."}
 notion = "*"
 pandas = "*"
 recordlinkage = "*"
 requests-oauthlib = "*"
 pytoml = "*"
 requests = "*"
+notion-client = "*"
+regex = "*"
+thought = {editable = true, path = "."}
 
 [requires]
 python_version = "3.9"

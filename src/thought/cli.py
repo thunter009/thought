@@ -1,10 +1,12 @@
-"""Console script for thought."""
 import logging
 import sys
+from email.policy import default
+from pathlib import Path
 
 import click
+import pandas as pd
 
-from thought.client import NotionAPI
+from thought.client import NotionAPIClient
 from thought.core import CollectionExtension, CollectionViewExtension, Output
 from thought.exceptions import (
     CollectionMustAlreadyExistException,
@@ -18,6 +20,13 @@ from thought.settings import (
     LOGGING_PATH,
     NOTION_SERVICES_DIRECTORY,
     SERVICES_CONFIGURATION_PATH,
+)
+from thought.utils import (
+    notion_clean_column_name,
+    notion_rich_text_to_plain_text,
+    notion_select_to_plain_text,
+    notion_url_to_uuid,
+    now,
 )
 
 FILE_NAME = __name__
@@ -49,11 +58,11 @@ CONTEXT = click.make_pass_decorator(Config, ensure=True)
 def cli(ctx,
         service_config_directory):
     '''
-        Thought - A Notion CLI
+        Thought - Notion CLI
     '''
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
-    ctx.client = NotionAPI().client
+    ctx.client = NotionAPIClient().client
 
 
 @cli.command('dedupe')
@@ -157,6 +166,7 @@ def sync(ctx,
         logging.INFO("%s action not defined for specified service. Please refer to docs.".format(action))
 
     data = service_instance.call(action, folder='archive') #TODO: onboard arbitrary key: values from click options here
+    breakpoint()
     
     page = client.get_block(target_collection)
     collection_name = f'{service}_{action}'
@@ -174,8 +184,152 @@ def sync(ctx,
     # drop to base object since we're confident this list should only contain 1 object
     collection = collection[0].collection
     service_instance.load(data, collection)
-    breakpoint()
 
+@cli.command('tojson')
+@click.argument('database_url')
+@click.option('-o', '--output', "_output", 
+              type=str,
+              help="The output path to save the exported data to",
+              default='.')
+@click.option('-c', '--columns', 
+              type=str,
+              help="The columns to export from the target database",
+              multiple=True,
+              default=None)
+@click.option('-f', '--filter', 
+              type=list,
+              help="The filter to apply to the target database",
+              default={})
+@CONTEXT
+def tojson(ctx,
+           database_url: str,
+           _output: str,
+           columns: list,
+           filter: dict
+           ) -> None:
+    '''
+        Exports a database view to JSON records format.
+
+        Arguments
+        ---------
+
+        database_url: The URL to a specific database (or view) you want to export as a JSON records array
+        filter: A JSON object specifying the filter to apply to the database
+
+        Example
+        ---------
+
+        `thought tojson "https://www.notion.so/<YOUR ORG>/<DATABASE_ID>?v=<VIEW_ID>"`
+    '''
+    client = ctx.client
+
+    # convert raw URL --> UUID
+    uuid = notion_url_to_uuid(database_url)
+
+    # construct query from CLI parameters
+    # TODO: pass filters via CLI params
+    
+    query = {
+        'database_id': uuid,
+        'filter': {
+            'property': 'alias',
+            'select': {
+                'equals': 'ramsay'
+            }
+        }
+    }
+
+    # send query and get back response JSON
+    result = client.databases.query(**query)
+
+    # error handle
+    
+    # filter down JSON response to export ready object
+    holder = []
+    for r in result['results']:
+        
+        # convert dict to df
+        df = pd.json_normalize(r)
+        
+        # handle all columns case
+        if len(columns) == 0:
+            input_columns = list(df.columns)
+        
+        # select only provided columns
+        else:
+            input_columns = [x for x in df.columns for y in columns if y in x]
+        
+        # TODO: add click option to include title column object + flatten it
+        reduced_columns = [
+            x for x in input_columns
+            if all([
+                '.id' not in x,
+                '.type' not in x,
+                '.color' not in x,
+                '.title' not in x,
+                '.rollup.' not in x,
+                '.last_edited_by' not in x,
+                '.created_by' not in x,
+                'properties.' in x
+            ])
+        ]
+        df = df[reduced_columns]
+        df = df.loc[:,~df.columns.duplicated()].copy()
+        breakpoint()
+
+        # handle rich_text fields
+        # TODO: make this a function
+        rich_text_columns = [x for x in df.columns if 'rich_text' in x]
+
+        if rich_text_columns:
+
+            for rt_col in rich_text_columns:
+                df[rt_col] = df[rt_col].apply(notion_rich_text_to_plain_text)
+        
+        # handle tag fields
+        # TODO: make this a function
+        
+        tag_columns = [
+            x for x in df.columns 
+            if any([
+                'multi_select' in x,
+                'select' in x,
+            ])
+        ]
+
+        if tag_columns:
+
+            for col in tag_columns:
+                df[col] = df[col].apply(notion_select_to_plain_text)
+
+        # handle name/id field
+        # TODO: make this a function
+        # formula_columns = [
+        #     x for x in df.columns 
+        #     if any([
+        #         '.formula.' in x,
+        #     ])
+        # ]
+
+        # if formula_columns:
+
+        #     for col in tag_columns:
+        #         df[col] = df[col].apply(notion_select_to_plain_text)
+
+        # change column names to "pure" column names without notion data structure cruft
+        
+        new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
+        df.rename(columns=new_column_names, inplace=True)
+        holder.append(df)
+
+
+    # write object to file
+    path = Path(_output) / Path(f'{uuid}-{now()}.json')
+    df = pd.concat(holder)
+    try:
+        df.to_json(path, orient='records')
+    except:
+        breakpoint()
 
 if __name__ == "__main__":
     sys.exit(cli())  # pragma: no cover
