@@ -27,8 +27,8 @@ requests-oauthlib = "*"
 pytoml = "*"
 requests = "*"
 notion-client = "*"
-thought = {editable = true, path = "."}
 regex = "*"
+thought = {editable = true, path = "."}
 
 [requires]
 python_version = "3.9"

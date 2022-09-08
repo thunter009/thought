@@ -230,13 +230,13 @@ def tojson(ctx,
     # TODO: pass filters via CLI params
     
     query = {
-        'database_id': uuid
-        # 'filter': {
-        #     'property': 'Name',
-        #     'rich_text': {
-        #         'contains': 'Test'
-        #     }
-        # }
+        'database_id': uuid,
+        'filter': {
+            'property': 'alias',
+            'select': {
+                'equals': 'ramsay'
+            }
+        }
     }
 
     # send query and get back response JSON
@@ -253,24 +253,29 @@ def tojson(ctx,
         
         # handle all columns case
         if len(columns) == 0:
-            transformed_input_columns = list(df.columns)
+            input_columns = list(df.columns)
         
         # select only provided columns
         else:
-            transformed_input_columns = [x for x in df.columns for y in columns if y in x]
+            input_columns = [x for x in df.columns for y in columns if y in x]
         
-        # TODO: add click option to include title column object + flatten it 
+        # TODO: add click option to include title column object + flatten it
         reduced_columns = [
-            x for x in transformed_input_columns 
+            x for x in input_columns
             if all([
                 '.id' not in x,
                 '.type' not in x,
                 '.color' not in x,
-                'properties.' in x,
-                '.title' not in x
+                '.title' not in x,
+                '.rollup.' not in x,
+                '.last_edited_by' not in x,
+                '.created_by' not in x,
+                'properties.' in x
             ])
         ]
         df = df[reduced_columns]
+        df = df.loc[:,~df.columns.duplicated()].copy()
+        breakpoint()
 
         # handle rich_text fields
         # TODO: make this a function
@@ -283,6 +288,7 @@ def tojson(ctx,
         
         # handle tag fields
         # TODO: make this a function
+        
         tag_columns = [
             x for x in df.columns 
             if any([
@@ -311,6 +317,7 @@ def tojson(ctx,
         #         df[col] = df[col].apply(notion_select_to_plain_text)
 
         # change column names to "pure" column names without notion data structure cruft
+        
         new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
         df.rename(columns=new_column_names, inplace=True)
         holder.append(df)
@@ -319,8 +326,10 @@ def tojson(ctx,
     # write object to file
     path = Path(_output) / Path(f'{uuid}-{now()}.json')
     df = pd.concat(holder)
-    df.to_json(path, orient='records')
-
+    try:
+        df.to_json(path, orient='records')
+    except:
+        breakpoint()
 
 if __name__ == "__main__":
     sys.exit(cli())  # pragma: no cover

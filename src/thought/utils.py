@@ -53,17 +53,17 @@ def notion_rich_text_to_plain_text(rich_text_list: list) -> str:
         holder.append(part['text']['content'])
     return ''.join(holder)
 
-def notion_select_to_plain_text(select_list: list) -> str:
+def notion_select_to_plain_text(input_value: list) -> str:
     """
     Converts a notion rich_text list into a plain text string
     """
-    if select_list:
+    if input_value and isinstance(input_value, list):
         holder = []
-        for part in select_list:
+        for part in input_value:
             holder.append(part['name'])
         return holder
     
-    return None
+    return input_value
         
 def notion_clean_column_name(column_name: str) -> str:
     """
@@ -73,12 +73,25 @@ def notion_clean_column_name(column_name: str) -> str:
     -------
     properties.ThisIsACheckbox.checkbox -> ThisIsACheckbox
     """
-    is_date_regex = r'(?<=properties\.)([a-zA-Z_ ]+\.date\.[a-zA-Z_ ]+)'
+    # handle date columns
+    is_date_regex = r'(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.date\.[a-zA-Z0-9_\-#.() ]+)'
     is_date = re.search(is_date_regex, column_name)
+
+    # handle formula columns
+    is_formula_regex = r'(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.formula\.[a-zA-Z0-9_\-#.() ]+)'
+    is_formula = re.search(is_formula_regex, column_name)
+
+    # handle select columns
+    is_select_regex = r'(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.select\.[a-zA-Z0-9_\-#.() ]+)'
+    is_select = re.search(is_select_regex, column_name)
 
     if is_date:
         return is_date.group().replace('.date.', '_')
+    elif is_formula:
+        return re.sub(r'\.formula\.[a-zA-Z0-9_\-#.() ]+', '', is_formula.group())
+    elif is_select:
+        return re.sub(r'\.select\.[a-zA-Z0-9_\-#.() ]+', '', is_select.group())
     else:
-        regex = r'(?<=properties\.)([a-zA-Z_ \u263a-\U0001f645]+)(?=\.[a-zA-Z_.]+)'
+        regex = r'(?<=properties\.)([a-zA-Z0-9_\-#.() \u263a-\U0001f645]+)(?=\.[a-zA-Z0-9_ ]+)'
         search = re.search(regex, column_name)
         return search.group() if search else column_name
