@@ -265,7 +265,7 @@ def tojson(
     # construct query from CLI parameters
     # TODO: pass filters via CLI params
 
-    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "carla"}}}
+    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "fred"}}}
 
     # send query and get back response JSON
     # result = client.databases.query(**query)
