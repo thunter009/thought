@@ -16,6 +16,7 @@ Sphinx = "*"
 twine = "*"
 autopep8 = "*"
 ipykernel = "*"
+black = "*"
 
 [packages]
 Click = "*"
