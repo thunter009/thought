@@ -106,3 +106,5 @@ ENV/
 .DS_Store
 
 *.json
+
+*.csv
