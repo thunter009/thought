@@ -512,11 +512,10 @@ def tocsv(
         holder.append(df)
 
     # write object to file
-    path = Path(_output) / Path(f"{uuid}-{now()}.json")
+    path = Path(_output) / Path(f"{uuid}-{now()}.csv")
     df = pd.concat(holder)
     try:
-        breakpoint()
-        df.to_json(path, orient="records")
+        df.to_csv(path, index=False)
     except:
         logger.debug("Something went wrong writing out %s", str(path))
 
