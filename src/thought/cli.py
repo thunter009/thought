@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -93,7 +94,6 @@ def dedupe(ctx, collection_url: str, field):
         deduped_df, id_col="id"
     )  # call to sync collection objects property data with dataframe records using object id as key
     # above does nothing...
-    breakpoint()
 
 
 @cli.command("sort")
@@ -189,7 +189,6 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
     data = service_instance.call(
         action, folder="archive"
     )  # TODO: onboard arbitrary key: values from click options here
-    breakpoint()
 
     page = client.get_block(target_collection)
     collection_name = f"{service}_{action}"
@@ -287,20 +286,19 @@ def tojson(
         else:
             input_columns = [x for x in df.columns for y in columns if f'properties.{y}' in x]
 
-        breakpoint()
         # TODO: add click option to include title column object + flatten it
         reduced_columns = [
             x
             for x in input_columns
             if all(
                 [
-                    ".id" not in x,
-                    ".type" not in x,
-                    ".color" not in x,
-                    ".title" not in x,
-                    ".rollup." not in x,
-                    ".last_edited_by" not in x,
-                    ".created_by" not in x,
+                    not re.search(r'\.id$', x),
+                    not re.search(r'\.type$', x),
+                    not re.search(r'\.color$', x),
+                    not re.search(r'\.title$', x),
+                    not re.search(r'\.rollup\.', x),
+                    not re.search(r'\.last_edited_by$', x),
+                    not re.search(r'\.created_by$', x),
                     "properties." in x,
                 ]
             )
@@ -352,7 +350,6 @@ def tojson(
 
         # change column names to "pure" column names without notion data structure cruft
 
-        breakpoint()
         new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
         df.rename(columns=new_column_names, inplace=True)
         holder.append(df)
@@ -449,13 +446,13 @@ def tocsv(
             for x in input_columns
             if all(
                 [
-                    ".id" not in x,
-                    ".type" not in x,
-                    ".color" not in x,
-                    ".title" not in x,
-                    ".rollup." not in x,
-                    ".last_edited_by" not in x,
-                    ".created_by" not in x,
+                    not re.search(r'\.id$', x),
+                    not re.search(r'\.type$', x),
+                    not re.search(r'\.color$', x),
+                    not re.search(r'\.title$', x),
+                    not re.search(r'\.rollup\.', x),
+                    not re.search(r'\.last_edited_by$', x),
+                    not re.search(r'\.created_by$', x),
                     "properties." in x,
                 ]
             )
