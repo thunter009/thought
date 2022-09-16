@@ -2,6 +2,7 @@ import copy
 from dataclasses import field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict
 
 import pytoml as toml
 import regex as re
@@ -95,3 +96,8 @@ def notion_clean_column_name(column_name: str) -> str:
         regex = r'(?<=properties\.)([a-zA-Z0-9_\-#.() \u263a-\U0001f645]+)(?=\.[a-zA-Z0-9_ ]+)'
         search = re.search(regex, column_name)
         return search.group() if search else column_name
+
+
+def notion_query(client, query: Dict[str, any]):
+    return client.databases.query(**query) 
+
