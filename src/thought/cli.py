@@ -21,6 +21,7 @@ from thought.settings import (
 )
 from thought.utils import (
     notion_clean_column_name,
+    notion_query,
     notion_rich_text_to_plain_text,
     notion_select_to_plain_text,
     notion_url_to_uuid,
@@ -264,16 +265,27 @@ def tojson(
     # construct query from CLI parameters
     # TODO: pass filters via CLI params
 
-    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "ramsay"}}}
+    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "fred"}}}
 
     # send query and get back response JSON
-    result = client.databases.query(**query)
+    # result = client.databases.query(**query)
+    result = notion_query(client, query)
 
-    # error handle
+    # handle pagination
+    # TODO: make this a recursive async function
+    results = []
+    has_more = result['has_more']
+    results.append(result['results'])
+    while has_more:
+        cursor = {'start_cursor': result['next_cursor']}
+        new_query = query | cursor
+        result = notion_query(client, new_query)
+        results.append(result['results'])
+        has_more = result['has_more']
 
     # filter down JSON response to export ready object
     holder = []
-    for r in result["results"]:
+    for r in results:
 
         # convert dict to df
         df = pd.json_normalize(r)
@@ -334,24 +346,13 @@ def tojson(
             for col in tag_columns:
                 df[col] = df[col].apply(notion_select_to_plain_text)
 
-        # handle name/id field
-        # TODO: make this a function
-        # formula_columns = [
-        #     x for x in df.columns
-        #     if any([
-        #         '.formula.' in x,
-        #     ])
-        # ]
-
-        # if formula_columns:
-
-        #     for col in tag_columns:
-        #         df[col] = df[col].apply(notion_select_to_plain_text)
-
         # change column names to "pure" column names without notion data structure cruft
-
         new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
         df.rename(columns=new_column_names, inplace=True)
+        
+        # drops subtly duplicate columns from entering the dataframe
+        df.dropna(axis=1, how='all', inplace=True)
+        
         holder.append(df)
 
     # write object to file
@@ -420,14 +421,23 @@ def tocsv(
 
     query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "ramsay"}}}
 
-    # send query and get back response JSON
-    result = client.databases.query(**query)
+    result = notion_query(client, query)
 
-    # error handle
+    # handle pagination
+    # TODO: make this a recursive async function
+    results = []
+    has_more = result['has_more']
+    results.append(result['results'])
+    while has_more:
+        cursor = {'start_cursor': result['next_cursor']}
+        new_query = query | cursor
+        result = notion_query(client, new_query)
+        results.append(result['results'])
+        has_more = result['has_more']
 
     # filter down JSON response to export ready object
     holder = []
-    for r in result["results"]:
+    for r in results:
 
         # convert dict to df
         df = pd.json_normalize(r)
