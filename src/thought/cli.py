@@ -26,6 +26,7 @@ from thought.utils import (
     notion_select_to_plain_text,
     notion_url_to_uuid,
     now,
+    pascal_to_lower_snake,
 )
 
 FILE_NAME = __name__
@@ -265,7 +266,7 @@ def tojson(
     # construct query from CLI parameters
     # TODO: pass filters via CLI params
 
-    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "fred"}}}
+    query = {"database_id": uuid, "filter": {"property": "status", "select": {"equals": "PROD"}}}
 
     # send query and get back response JSON
     # result = client.databases.query(**query)
@@ -274,14 +275,14 @@ def tojson(
     # handle pagination
     # TODO: make this a recursive async function
     results = []
-    has_more = result['has_more']
-    results.append(result['results'])
+    has_more = result["has_more"]
+    results.append(result["results"])
     while has_more:
-        cursor = {'start_cursor': result['next_cursor']}
+        cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
         result = notion_query(client, new_query)
-        results.append(result['results'])
-        has_more = result['has_more']
+        results.append(result["results"])
+        has_more = result["has_more"]
 
     # filter down JSON response to export ready object
     holder = []
@@ -296,7 +297,7 @@ def tojson(
 
         # select only provided columns
         else:
-            input_columns = [x for x in df.columns for y in columns if f'properties.{y}' in x]
+            input_columns = [x for x in df.columns for y in columns if f"properties.{y}" in x]
 
         # TODO: add click option to include title column object + flatten it
         reduced_columns = [
@@ -304,13 +305,13 @@ def tojson(
             for x in input_columns
             if all(
                 [
-                    not re.search(r'\.id$', x),
-                    not re.search(r'\.type$', x),
-                    not re.search(r'\.color$', x),
-                    not re.search(r'\.title$', x),
-                    not re.search(r'\.rollup\.', x),
-                    not re.search(r'\.last_edited_by$', x),
-                    not re.search(r'\.created_by$', x),
+                    not re.search(r"\.id$", x),
+                    not re.search(r"\.type$", x),
+                    not re.search(r"\.color$", x),
+                    not re.search(r"\.title$", x),
+                    not re.search(r"\.rollup\.", x),
+                    not re.search(r"\.last_edited_by$", x),
+                    not re.search(r"\.created_by$", x),
                     "properties." in x,
                 ]
             )
@@ -349,15 +350,19 @@ def tojson(
         # change column names to "pure" column names without notion data structure cruft
         new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
         df.rename(columns=new_column_names, inplace=True)
-        
+
         # drops subtly duplicate columns from entering the dataframe
-        df.dropna(axis=1, how='all', inplace=True)
-        
+        df.dropna(axis=1, how="all", inplace=True)
+
         holder.append(df)
 
     # write object to file
     path = Path(_output) / Path(f"{uuid}-{now()}.json")
     df = pd.concat(holder)
+
+    if lower_snake_case:
+        df = pascal_to_lower_snake(df, 'metric')
+        df = pascal_to_lower_snake(df, 'metric_v2')
     try:
         df.to_json(path, orient="records")
     except:
@@ -426,14 +431,14 @@ def tocsv(
     # handle pagination
     # TODO: make this a recursive async function
     results = []
-    has_more = result['has_more']
-    results.append(result['results'])
+    has_more = result["has_more"]
+    results.append(result["results"])
     while has_more:
-        cursor = {'start_cursor': result['next_cursor']}
+        cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
         result = notion_query(client, new_query)
-        results.append(result['results'])
-        has_more = result['has_more']
+        results.append(result["results"])
+        has_more = result["has_more"]
 
     # filter down JSON response to export ready object
     holder = []
@@ -448,7 +453,7 @@ def tocsv(
 
         # select only provided columns
         else:
-            input_columns = [x for x in df.columns for y in columns if f'properties.{y}' in x]
+            input_columns = [x for x in df.columns for y in columns if f"properties.{y}" in x]
 
         # TODO: add click option to include title column object + flatten it
         reduced_columns = [
@@ -456,13 +461,13 @@ def tocsv(
             for x in input_columns
             if all(
                 [
-                    not re.search(r'\.id$', x),
-                    not re.search(r'\.type$', x),
-                    not re.search(r'\.color$', x),
-                    not re.search(r'\.title$', x),
-                    not re.search(r'\.rollup\.', x),
-                    not re.search(r'\.last_edited_by$', x),
-                    not re.search(r'\.created_by$', x),
+                    not re.search(r"\.id$", x),
+                    not re.search(r"\.type$", x),
+                    not re.search(r"\.color$", x),
+                    not re.search(r"\.title$", x),
+                    not re.search(r"\.rollup\.", x),
+                    not re.search(r"\.last_edited_by$", x),
+                    not re.search(r"\.created_by$", x),
                     "properties." in x,
                 ]
             )
