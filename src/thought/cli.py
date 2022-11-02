@@ -35,7 +35,9 @@ logging.basicConfig(
     datefmt=LOGGING_DATE_FORMAT,
     format=LOGGING_FORMAT,
     handlers=[
-        logging.FileHandler(f"{LOGGING_PATH}/{FILE_NAME}.log", encoding=None, delay=False),
+        logging.FileHandler(
+            f"{LOGGING_PATH}/{FILE_NAME}.log", encoding=None, delay=False
+        ),
         logging.StreamHandler(),
     ],
 )
@@ -91,7 +93,11 @@ def dedupe(ctx, collection_url: str, field):
     client = ctx.client
     col_view = client.get_collection_view(collection_url)
     collection = CollectionExtension(col_view.collection)
-    deduped_df = collection.dedupe(comparison_fields=list(field)) if field else collection.dedupe()
+    deduped_df = (
+        collection.dedupe(comparison_fields=list(field))
+        if field
+        else collection.dedupe()
+    )
     collection.sync(
         deduped_df, id_col="id"
     )  # call to sync collection objects property data with dataframe records using object id as key
@@ -100,7 +106,9 @@ def dedupe(ctx, collection_url: str, field):
 
 @cli.command("sort")
 @click.argument("url")
-@click.option("-f", "--field", default="tags", help='The field to sort on. Defaults to "tags"')
+@click.option(
+    "-f", "--field", default="tags", help='The field to sort on. Defaults to "tags"'
+)
 @click.option(
     "--sort_multiselect_schema_values",
     is_flag=True,
@@ -182,11 +190,14 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 
     if not service_instance:
         logging.info(
-            "%s service not defined and configured properly. Please refer to docs.", service
+            "%s service not defined and configured properly. Please refer to docs.",
+            service,
         )
 
     if not service_instance[action]:
-        logging.info("%s action not defined for specified service. Please refer to docs.", action)
+        logging.info(
+            "%s action not defined for specified service. Please refer to docs.", action
+        )
 
     data = service_instance.call(
         action, folder="archive"
@@ -200,7 +211,9 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 
     if not collection:
         # TODO: create new collection if nothing matches our {service}_{action} nameing pattern -- blocked by API support as of 8/11/20
-        raise CollectionMustAlreadyExistException(f"{collection_name} must already exist")
+        raise CollectionMustAlreadyExistException(
+            f"{collection_name} must already exist"
+        )
 
     if len(collection) > 1:
         raise LoadDestinationNotUniqueException(
@@ -231,7 +244,11 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
     default=None,
 )
 @click.option(
-    "-f", "--filter", type=list, help="The filter to apply to the target database", default={}
+    "-f",
+    "--filter",
+    type=list,
+    help="The filter to apply to the target database",
+    default={},
 )
 @click.option(
     "-lsc",
@@ -242,7 +259,11 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 )
 @CONTEXT
 def tojson(
-    ctx, database_url: str, _output: str, columns: list, filter: dict, lower_snake_case: str
+    ctx,
+    database_url: str,
+    _output: str,
+    columns: list,
+    lower_snake_case: str,
 ) -> None:
     """
     Exports a database view to JSON records format.
@@ -266,7 +287,10 @@ def tojson(
     # construct query from CLI parameters
     # TODO: pass filters via CLI params
 
-    query = {"database_id": uuid, "filter": {"property": "status", "select": {"equals": "PROD"}}}
+    query = {
+        "database_id": uuid,
+        "filter": {"property": "status", "select": {"equals": "PROD"}},
+    }
 
     # send query and get back response JSON
     # result = client.databases.query(**query)
@@ -297,7 +321,9 @@ def tojson(
 
         # select only provided columns
         else:
-            input_columns = [x for x in df.columns for y in columns if f"properties.{y}" in x]
+            input_columns = [
+                x for x in df.columns for y in columns if f"properties.{y}" in x
+            ]
 
         # TODO: add click option to include title column object + flatten it
         reduced_columns = [
@@ -361,8 +387,8 @@ def tojson(
     df = pd.concat(holder)
 
     if lower_snake_case:
-        df = pascal_to_lower_snake(df, 'metric')
-        df = pascal_to_lower_snake(df, 'metric_v2')
+        df = pascal_to_lower_snake(df, "metric")
+        df = pascal_to_lower_snake(df, "metric_v2")
     try:
         df.to_json(path, orient="records")
     except:
@@ -388,7 +414,11 @@ def tojson(
     default=None,
 )
 @click.option(
-    "-f", "--filter", type=list, help="The filter to apply to the target database", default={}
+    "-f",
+    "--filter",
+    type=list,
+    help="The filter to apply to the target database",
+    default={},
 )
 @click.option(
     "-lsc",
@@ -399,7 +429,12 @@ def tojson(
 )
 @CONTEXT
 def tocsv(
-    ctx, database_url: str, _output: str, columns: list, filter: dict, lower_snake_case: str
+    ctx,
+    database_url: str,
+    _output: str,
+    columns: list,
+    filter: dict,
+    lower_snake_case: str,
 ) -> None:
     """
     Exports a database view to CSV format.
@@ -424,7 +459,7 @@ def tocsv(
     # construct query from CLI parameters
     # TODO: pass filters via CLI params
 
-    query = {"database_id": uuid, "filter": {"property": "alias", "select": {"equals": "ramsay"}}}
+    query = {"database_id": uuid}
 
     result = notion_query(client, query)
 
@@ -453,7 +488,9 @@ def tocsv(
 
         # select only provided columns
         else:
-            input_columns = [x for x in df.columns for y in columns if f"properties.{y}" in x]
+            input_columns = [
+                x for x in df.columns for y in columns if f"properties.{y}" in x
+            ]
 
         # TODO: add click option to include title column object + flatten it
         reduced_columns = [
@@ -525,6 +562,7 @@ def tocsv(
 
     # write object to file
     path = Path(_output) / Path(f"{uuid}-{now()}.csv")
+
     df = pd.concat(holder)
     try:
         df.to_csv(path, index=False)
