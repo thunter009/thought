@@ -17,6 +17,7 @@ twine = "*"
 autopep8 = "*"
 ipykernel = "*"
 black = "*"
+pre-commit = "*"
 
 [packages]
 Click = "*"
@@ -32,4 +33,4 @@ regex = "*"
 thought = {editable = true, path = "."}
 
 [requires]
-python_version = "3.9"
+python_version = "3.10"
