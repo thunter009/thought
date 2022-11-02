@@ -263,7 +263,6 @@ def tojson(
     database_url: str,
     _output: str,
     columns: list,
-    filter: dict,
     lower_snake_case: str,
 ) -> None:
     """

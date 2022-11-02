@@ -35,14 +35,14 @@ def default_field(obj, **kwargs):
 def notion_url_to_uuid(url: str) -> str:
     """
     converts a valid Notion URL to a UUID
-
-    e.g. https://www.notion.so/teehuntz/022f2194a8c040709992a2533a99cdbe\?v\=55194a17a1e64b9db5d45289d5fb412f --> 40d4e41a-255a-4140-ab7b-2da041e953db
     """
     regex = r"(?<=https:\/\/www.notion.so\/[a-zA-Z0-9]+\/)[a-zA-Z0-9]{32}"
     search = re.search(regex, url)
     if search:
         result = search.group()
-        result = f"{result[:8]}-{result[8:12]}-{result[12:16]}-{result[16:20]}-{result[20:]}"
+        result = (
+            f"{result[:8]}-{result[8:12]}-{result[12:16]}-{result[16:20]}-{result[20:]}"
+        )
     return result
 
 
@@ -78,15 +78,21 @@ def notion_clean_column_name(column_name: str) -> str:
     properties.ThisIsACheckbox.checkbox -> ThisIsACheckbox
     """
     # handle date columns
-    is_date_regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.date\.[a-zA-Z0-9_\-#.() ]+)"
+    is_date_regex = (
+        r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.date\.[a-zA-Z0-9_\-#.() ]+)"
+    )
     is_date = re.search(is_date_regex, column_name)
 
     # handle formula columns
-    is_formula_regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.formula\.[a-zA-Z0-9_\-#.() ]+)"
+    is_formula_regex = (
+        r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.formula\.[a-zA-Z0-9_\-#.() ]+)"
+    )
     is_formula = re.search(is_formula_regex, column_name)
 
     # handle select columns
-    is_select_regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.select\.[a-zA-Z0-9_\-#.() ]+)"
+    is_select_regex = (
+        r"(?<=properties\.)([a-zA-Z0-9_\-#.() ]+\.select\.[a-zA-Z0-9_\-#.() ]+)"
+    )
     is_select = re.search(is_select_regex, column_name)
 
     if is_date:
@@ -96,7 +102,7 @@ def notion_clean_column_name(column_name: str) -> str:
     elif is_select:
         return re.sub(r"\.select\.[a-zA-Z0-9_\-#.() ]+", "", is_select.group())
     else:
-        regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() \u263a-\U0001f645]+)(?=\.[a-zA-Z0-9_ ]+)"
+        regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() \u263a-\U0001f645]+)(?=\.[a-zA-Z0-9_ ]+)"  # noqa E501
         search = re.search(regex, column_name)
         return search.group() if search else column_name
 
