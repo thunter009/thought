@@ -304,7 +304,7 @@ def tojson(
     while has_more:
         cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
-        result = notion_query(client, new_query)
+        result = client.query(new_query)
         results.append(result["results"])
         has_more = result["has_more"]
 
