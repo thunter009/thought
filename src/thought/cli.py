@@ -97,10 +97,6 @@ def dedupe(ctx, collection_url: str, field):
         if field
         else collection.dedupe()
     )
-    collection.sync(
-        deduped_df, id_col="id"
-    )  # call to sync collection objects property data with dataframe records using object id as key
-    # above does nothing...
 
 
 @cli.command("sort")
@@ -461,7 +457,7 @@ def tocsv(
 
     query = {"database_id": uuid}
 
-    result = notion_query(client, query)
+    result = client.query(query)
 
     # handle pagination
     # TODO: make this a recursive async function
@@ -471,7 +467,7 @@ def tocsv(
     while has_more:
         cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
-        result = notion_query(client, new_query)
+        result = client.query(new_query)
         results.append(result["results"])
         has_more = result["has_more"]
 

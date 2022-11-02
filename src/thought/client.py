@@ -21,6 +21,7 @@ class NotionAPIClient:
         """
         Sends a query to the Notion API
         """
+        assert self.client is not None
         return self.client.databases.query(**query)
 
     def get_client(self, token: str) -> NotionClient:
