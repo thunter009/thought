@@ -19,6 +19,7 @@ ipykernel = "*"
 black = "*"
 pre-commit = "*"
 pytest = "*"
+pytest-cov = "*"
 
 [packages]
 Click = "*"

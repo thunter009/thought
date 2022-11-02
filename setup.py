@@ -28,6 +28,7 @@ setup(
             "black",
             "pre-commit",
             "pytest",
+            "pytest-cov",
         ]
     },
     author="Tom Hunter",
