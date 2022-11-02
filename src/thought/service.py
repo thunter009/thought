@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 from requests_oauthlib import OAuth1Session
@@ -16,7 +16,7 @@ class GenericService:
     _type: str = default_field("generic", init=False)
     metadata: Metadata = default_field(Metadata(), init=False, repr=False)
 
-    RESERVED_WORDS: List[str] = default_field(
+    RESERVED_WORDS: list[str] = default_field(
         ["call", "load", "client", "data", "authorize", "metadata"],
         init=False,
         repr=False,
@@ -83,7 +83,7 @@ class Registry:
     Service registry which holds all properly registered services
     """
 
-    services: Dict[str, Any] = default_field(
+    services: dict[str, Any] = default_field(
         {}, init=False
     )  # a dictionary of service names: service objects
 

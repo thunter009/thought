@@ -21,7 +21,6 @@ from thought.settings import (
 )
 from thought.utils import (
     notion_clean_column_name,
-    notion_query,
     notion_rich_text_to_plain_text,
     notion_select_to_plain_text,
     notion_url_to_uuid,
@@ -69,7 +68,7 @@ def cli(ctx, service_config_directory):
     """
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
-    ctx.client = NotionAPIClient().client
+    ctx.client = NotionAPIClient()
 
 
 @cli.command("dedupe")
@@ -294,7 +293,8 @@ def tojson(
 
     # send query and get back response JSON
     # result = client.databases.query(**query)
-    result = notion_query(client, query)
+    result = client.query(query)
+    # result = notion_query(client, query)
 
     # handle pagination
     # TODO: make this a recursive async function

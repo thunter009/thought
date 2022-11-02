@@ -27,6 +27,7 @@ setup(
             "ipykernel",
             "black",
             "pre-commit",
+            "pytest",
         ]
     },
     author="Tom Hunter",

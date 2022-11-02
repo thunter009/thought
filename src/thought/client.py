@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Dict
 
 from notion_client import Client as NotionClient
 
@@ -17,3 +18,9 @@ class NotionAPIClient:
     """
 
     client: NotionClient = default_field(get_client())
+
+    def query(client, query: dict[str, any]):
+        """
+        Sends a query to the Notion API
+        """
+        return self.client.databases.query(**query)

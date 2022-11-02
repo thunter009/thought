@@ -107,10 +107,6 @@ def notion_clean_column_name(column_name: str) -> str:
         return search.group() if search else column_name
 
 
-def notion_query(client, query: Dict[str, any]):
-    return client.databases.query(**query)
-
-
 def pascal_to_lower_snake(df: pd.DataFrame, column: str) -> str:
     df[column] = (
         df[column]
