@@ -4,7 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-bump2version = "*"
+versioneer = "*"
 wheel = "*"
 watchdog = "*"
 pylint = "*"
@@ -13,13 +13,13 @@ pdbpp = "*"
 tox = "*"
 coverage = "*"
 Sphinx = "*"
-twine = "*"
 autopep8 = "*"
 ipykernel = "*"
 black = "*"
 pre-commit = "*"
 pytest = "*"
 pytest-cov = "*"
+mypy = "*"
 
 [packages]
 Click = "*"

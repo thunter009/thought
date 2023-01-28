@@ -1,6 +1,13 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools", "wheel", "versioneer[toml]==0.28"]
 build-backend = "setuptools.build_meta:__legacy__"
 
 [tool.black]
 line-length = 88
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "src/thought/_version.py"
+versionfile_build = "thought/_version.py"
+tag_prefix = ""
