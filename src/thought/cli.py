@@ -21,7 +21,6 @@ from thought.settings import (
 )
 from thought.utils import (
     notion_clean_column_name,
-    notion_query,
     notion_rich_text_to_plain_text,
     notion_select_to_plain_text,
     notion_url_to_uuid,
@@ -69,7 +68,7 @@ def cli(ctx, service_config_directory):
     """
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
-    ctx.client = NotionAPIClient().client
+    ctx.client = NotionAPIClient()
 
 
 @cli.command("dedupe")
@@ -98,10 +97,6 @@ def dedupe(ctx, collection_url: str, field):
         if field
         else collection.dedupe()
     )
-    collection.sync(
-        deduped_df, id_col="id"
-    )  # call to sync collection objects property data with dataframe records using object id as key
-    # above does nothing...
 
 
 @cli.command("sort")
@@ -294,7 +289,8 @@ def tojson(
 
     # send query and get back response JSON
     # result = client.databases.query(**query)
-    result = notion_query(client, query)
+    result = client.query(query)
+    # result = notion_query(client, query)
 
     # handle pagination
     # TODO: make this a recursive async function
@@ -304,7 +300,7 @@ def tojson(
     while has_more:
         cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
-        result = notion_query(client, new_query)
+        result = client.query(new_query)
         results.append(result["results"])
         has_more = result["has_more"]
 
@@ -461,7 +457,7 @@ def tocsv(
 
     query = {"database_id": uuid}
 
-    result = notion_query(client, query)
+    result = client.query(query)
 
     # handle pagination
     # TODO: make this a recursive async function
@@ -471,7 +467,7 @@ def tocsv(
     while has_more:
         cursor = {"start_cursor": result["next_cursor"]}
         new_query = query | cursor
-        result = notion_query(client, new_query)
+        result = client.query(new_query)
         results.append(result["results"])
         has_more = result["has_more"]
 

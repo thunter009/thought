@@ -4,6 +4,7 @@ from typing import Dict
 import pandas as pd
 from requests_oauthlib import OAuth1Session
 
+from thought.exceptions import CredentialsNotAuthorizedException
 from thought.service import APIService
 from thought.settings import (
     INSTAPAPER_BASE_URL,

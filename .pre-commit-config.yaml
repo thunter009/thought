@@ -1,12 +1,12 @@
 ---
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v2.3.0
+      rev: v4.4.0
       hooks:
           - id: check-yaml
+          - id: check-toml
           - id: trailing-whitespace
             exclude_types: [csv, json]
-          # - id: flake8
     - repo: https://github.com/Madoshakalaka/pipenv-setup
       rev: v3.2.0
       hooks:
@@ -16,7 +16,16 @@ repos:
                 - vistir==0.6.1
                 - black
 
+    - repo: https://github.com/PyCQA/flake8
+      rev: 6.0.0
+      hooks:
+          - id: flake8
+            exclude: ^testing/(data|examples)/|_version.py
     - repo: https://github.com/ambv/black
-      rev: 22.10.0
+      rev: 22.12.0
       hooks:
           - id: black
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v0.991
+      hooks:
+          - id: mypy

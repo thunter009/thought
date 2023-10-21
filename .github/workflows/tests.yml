@@ -1,0 +1,43 @@
+name: Run Test Suite via Pytest
+
+on:
+    push:
+        branches:
+            - master
+            - dev
+    pull_request:
+
+jobs:
+    tests:
+        name: test_suite
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-latest"]
+                python-version: ["3.10"]
+
+        steps:
+            - id: "checkout"
+              name: Checkout branch
+              uses: actions/checkout@v3
+
+            - id: "cancel-previous"
+              name: Cancel Previous Runs
+              uses: styfle/cancel-workflow-action@0.11.0
+              with:
+                  access_token: ${{ github.token }}
+
+            - id: "setup"
+              name: "Set up environment"
+              uses: actions/setup-python@v4
+              with:
+                  python-version: ${{ matrix.python-version }}
+                  cache: "pipenv"
+            - run: pipx install pipenv
+            - run: pipenv install --dev && pipenv install -e .
+
+            - id: "tests"
+              name: "Run test suite"
+              run: |-
+                  pipenv run pytest -vv --cov=src/ --cov-report=xml --no-cov-on-fail
