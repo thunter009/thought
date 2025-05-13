@@ -79,11 +79,10 @@ jobs:
             ################################
             # Set up Python
             ################################
-            - name: Setup Python Environment
-              uses: ./.github/workflows/setup-python.yml
+            - name: Set up Python
+              uses: actions/setup-python@v5
               with:
                   python-version: "3.11"
-                  cache-key: "lint"
 
             ################################
             # Setup uv
@@ -91,12 +90,10 @@ jobs:
             - name: Setup uv
               id: uv-version
               run: |
-                  # Install uv and keep it installed
                   curl -LsSf https://astral.sh/uv/install.sh | sh
                   UV_VERSION=$(/home/runner/.local/bin/uv --version | cut -d' ' -f2)
                   echo "version=$UV_VERSION" >> $GITHUB_OUTPUT
                   echo "uv-version=$UV_VERSION"
-                  # Add uv to PATH
                   echo "/home/runner/.local/bin" >> $GITHUB_PATH
 
             ################################
@@ -110,15 +107,16 @@ jobs:
                       .venv
                       ~/.cache/uv
                       ~/.local/share/uv
-                  key: ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-${{ hashFiles('pyproject.toml') }}
+                  key: ${{ runner.os }}-python-env-3.11-uv-${{ steps.uv-version.outputs.version }}-lint-${{ hashFiles('pyproject.toml') }}
                   restore-keys: |
-                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-
-                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-
+                      ${{ runner.os }}-python-env-3.11-uv-${{ steps.uv-version.outputs.version }}-lint-
+                      ${{ runner.os }}-python-env-3.11-
 
             ################################
             # Setup Python environment
             ################################
             - name: Setup Python environment
+              id: setup-env
               run: |
                   set -eo pipefail
                   if [ "${{ steps.cache-restore.outputs.cache-hit }}" != 'true' ]; then
@@ -137,7 +135,7 @@ jobs:
             ################################
             - name: Run Ruff linter
               run: |
-                  source ${{ needs.setup.outputs.venv-path }}/bin/activate
+                  source .venv/bin/activate
                   ruff check .
 
             ################################
@@ -145,7 +143,7 @@ jobs:
             ################################
             - name: Run Ruff formatter
               run: |
-                  source ${{ needs.setup.outputs.venv-path }}/bin/activate
+                  source .venv/bin/activate
                   ruff format --check .
 
             ################################
