@@ -21,7 +21,45 @@ uv pip install -e ".[dev]"
 
 ## Features
 
-* TODO
+* **Collection Management**
+  * Deduplicate items in collections using flexible comparison fields
+  * Sort collections by any field, with support for multi-select value sorting
+  * Convert collections to pandas DataFrames for data manipulation
+
+* **Data Export**
+  * Export Notion databases to JSON format
+  * Export Notion databases to CSV format
+  * Customize exported columns and apply filters
+  * Option to convert column names to lower snake case
+
+* **Service Integration**
+  * Sync data from external services (e.g., Instapaper)
+  * Extensible service architecture for adding new integrations
+  * OAuth support for secure API authentication
+
+* **Data Processing**
+  * Built-in support for pandas DataFrames
+  * Advanced record linkage for deduplication
+  * Flexible data transformation and cleaning utilities
+
+## Example Commands
+
+```bash
+# Deduplicate items in a collection
+thought dedupe "https://notion.so/your-collection-url"
+
+# Sort a collection by a specific field
+thought sort "https://notion.so/your-collection-url" --field "tags"
+
+# Sync data from external services (e.g. Instapaper)
+thought sync instapaper bookmarks --target_collection="https://notion.so/your-page-url"
+
+# Export database to JSON
+thought tojson "https://notion.so/your-database-url" --output="data.json"
+
+# Export database to CSV
+thought tocsv "https://notion.so/your-database-url" --output="data.csv"
+```
 
 ## Development
 
@@ -36,19 +74,19 @@ The project uses modern Python tooling:
 
 ```bash
 # Run tests
-thought dev test
+pytest
 
 # Run linter
-thought dev lint
+ruff check .
 
 # Run type checker
-thought dev typecheck
+mypy .
 
 # Format code
-thought dev format
+ruff format .
 
 # Clean build artifacts
-thought dev clean
+rm -rf build/ dist/ *.egg-info/
 ```
 
 ## License
