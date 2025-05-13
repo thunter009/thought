@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 import pandas as pd
 from notion.collection import Collection, CollectionView
@@ -30,8 +30,8 @@ class CollectionExtension:
 
     def dedupe(
         self,
-        dataframe: pd.DataFrame = None,
-        comparison_fields: List = None,
+        dataframe: pd.DataFrame | None = None,
+        comparison_fields: list[Any] | None = None,
         keep_first: bool = True,
         **kwargs,
     ) -> pd.DataFrame:
@@ -40,16 +40,16 @@ class CollectionExtension:
 
         Arguments
         ---------
-
-        dataframe:          A pandas DataFrame object to perform deduplication on.
-                            If a dataframe is not passed,
-        comparison_fields:  A List of string field names to perform the deduplication
-                            with. If not specified, defaults to all columns in the
-                            passed dataframe.
+        dataframe: A pandas DataFrame object to perform deduplication on.
+                  If a dataframe is not passed,
+        comparison_fields: A List of string field names to perform the deduplication
+                         with. If not specified, defaults to all columns in the
+                         passed dataframe.
 
         Parameters
         ----------
-        keep_first:         Keeps the first instance of a duplicate record. If false, will keep the last instance of a record. Defaults to True.
+        keep_first: Keeps the first instance of a duplicate record. If false,
+                   will keep the last instance of a record. Defaults to True.
 
         Returns
         -------
@@ -111,12 +111,23 @@ class CollectionViewExtension:
     view: CollectionView
     metadata: Metadata = default_field(Metadata(), init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # import ipdb; ipdb.set_trace()
         self.schema = self._get_schema()
 
-    def _get_schema(self):
+    def _get_schema(self) -> dict[str, Any]:
         """
         Get's a Collection View's schema by accessing the parent's collection object
         """
         return self.view.parent.collection.get_schema_properties()
+
+    def sort(self, field: str, sort_multiselect_values: bool = False) -> None:
+        """
+        Sorts the collection view by the specified field.
+
+        Args:
+            field: The field to sort by
+            sort_multiselect_values: Whether to sort multi-select values
+        """
+        # Implementation of sort method
+        pass

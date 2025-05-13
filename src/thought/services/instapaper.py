@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Dict
 
 import pandas as pd
 from requests_oauthlib import OAuth1Session
@@ -33,11 +32,11 @@ class InstapaperAPI(APIService):
     def __post_init__(self):
         self.authorize()
 
-    def _concate_url_from_parts(self, suffix: str):
+    def _concate_url_from_parts(self, suffix: str) -> str:
         return "/".join([self._base_url, str(self._api_version), suffix])
 
     @staticmethod
-    def _build_auth_params():
+    def _build_auth_params() -> dict[str, str]:
         return {
             "x_auth_username": INSTAPAPER_USER,
             "x_auth_password": INSTAPAPER_PASS,
@@ -55,7 +54,7 @@ class InstapaperAPI(APIService):
         holder = []
         for line in response.json():
             line_keys = set(line.keys())
-            if line_keys == metadata_keys or line_keys == account_keys:
+            if line_keys in {metadata_keys, account_keys}:
                 continue
             holder.append(line)
         return pd.DataFrame(holder)
@@ -72,7 +71,7 @@ class InstapaperAPI(APIService):
             INSTAPAPER_CONSUMER_ID, client_secret=INSTAPAPER_CONSUMER_SECRET
         )
         params = self._build_auth_params()
-        credentials = session.fetch_request_token(auth_token_url, params=params)
+        session.fetch_request_token(auth_token_url, params=params)
 
         if not session.authorized:
             raise CredentialsNotAuthorizedException(

@@ -1,8 +1,7 @@
 import copy
 from dataclasses import field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict
 
 import pandas as pd
 import regex as re
@@ -21,7 +20,7 @@ def now():
     """
     returns current UTC timestamp
     """
-    utc_dt = datetime.now(timezone.utc)  # UTC time
+    utc_dt = datetime.now(UTC)  # UTC time
     return utc_dt
 
 

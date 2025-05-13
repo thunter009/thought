@@ -47,22 +47,19 @@ class GenericService:
         """
         try:
             return self[action](**kwargs)
-        except Exception as e:
+        except Exception:
             breakpoint()
 
     def load(self, data: pd.DataFrame, target: CollectionExtension, style="append"):
         """
         Loads provided pandas dataframe to notion collection
         """
-        for row in data.iterrows():
-            import ipdb
-
-            ipdb.set_trace()
+        for _ in data.iterrows():
+            pass
 
 
 @dataclass
 class APIService(GenericService):
-
     _type: str = default_field("api", init=False)
     _auth_type: str = default_field("oauth", init=False, repr=False)
     client: OAuth1Session = default_field(None, init=False, repr=False)
@@ -102,12 +99,13 @@ class Registry:
         # watch out! risky code ahead!
         to_import = f"thought.services.{service_name}"
         try:
-            sn = import_module(to_import)
-            output = eval(f"sn.{SERVICES_REGISTERED[service_name]}")
-        except ModuleNotFoundError:
+            output = eval(
+                f"{import_module(to_import)}.{SERVICES_REGISTERED[service_name]}"
+            )
+        except ModuleNotFoundError as err:
             raise ServiceNotRegisteredException(
                 f"{service_name} is not a properly configured service"
-            )
+            ) from err
 
         # register the requested service
         self.services[service_name] = output

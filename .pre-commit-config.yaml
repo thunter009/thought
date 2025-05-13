@@ -1,31 +1,30 @@
 ---
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v4.4.0
+      rev: v5.0.0
       hooks:
           - id: check-yaml
           - id: check-toml
+          - id: check-json
+          - id: check-merge-conflict
+          - id: check-case-conflict
+          - id: check-docstring-first
+          - id: check-symlinks
+          - id: debug-statements
           - id: trailing-whitespace
             exclude_types: [csv, json]
-    - repo: https://github.com/Madoshakalaka/pipenv-setup
-      rev: v3.2.0
-      hooks:
-          - id: pipenv-setup
-            args: [--dev, --pipfile]
-            additional_dependencies:
-                - vistir==0.6.1
-                - black
+          - id: end-of-file-fixer
+            exclude: tests(/\w*)*/|scripts(/\w*)*/|Dockerfile|(/\w*)*.ini|(/\w*)*.toml|(/\w*)*.yml|(/\w*)*.in|(/\w*)*.ipynb
+            exclude_types: [csv, json]
 
-    - repo: https://github.com/PyCQA/flake8
-      rev: 6.0.0
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.11.9
       hooks:
-          - id: flake8
-            exclude: ^testing/(data|examples)/|_version.py
-    - repo: https://github.com/ambv/black
-      rev: 22.12.0
-      hooks:
-          - id: black
+          - id: ruff
+            args: [--fix]
+          - id: ruff-format
+
     - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v0.991
+      rev: v1.15.0
       hooks:
           - id: mypy
