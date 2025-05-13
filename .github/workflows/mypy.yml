@@ -81,6 +81,7 @@ jobs:
                     uv venv --seed --python 3.11
                   fi
                   source .venv/bin/activate
+                  uv pip install -e .
                   uv sync --extra dev
 
             - name: Save Python environment cache
