@@ -15,35 +15,148 @@ name: Lint Code Base
 # Start the job on all push #
 #############################
 on:
-  push:
-    branches-ignore:
-      - 'master'
+    push:
+        branches:
+            - main
+            - dev
+    pull_request:
+        branches:
+            - main
+            - dev
+
+env:
+    ACTIONS_RUNNER_DEBUG: ${{ vars.ACTIONS_RUNNER_DEBUG }}
+    ACTIONS_STEP_DEBUG: ${{ vars.ACTIONS_STEP_DEBUG }}
 
 ###############
 # Set the Job #
 ###############
 jobs:
-  build:
-    # Name the Job
-    name: Lint Code Base
-    # Set the agent to run on
-    runs-on: ubuntu-latest
+    lint:
+        # Name the Job
+        name: Lint Code Base
+        # Set the agent to run on
+        runs-on: ubuntu-latest
 
-    ##################
-    # Load all steps #
-    ##################
-    steps:
-      ##########################
-      # Checkout the code base #
-      ##########################
-      - name: Checkout Code
-        uses: actions/checkout@v2
+        ##################
+        # Load all steps #
+        ##################
+        steps:
+            ##########################
+            # Checkout the code base #
+            ##########################
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-      ################################
-      # Run Linter against code base #
-      ################################
-      - name: Lint Code Base
-        uses: docker://github/super-linter:v2.1.1
-        env:
-          VALIDATE_ALL_CODEBASE: false
-          VALIDATE_ANSIBLE: false
+            ################################
+            # Cancel Previous Runs
+            ################################
+            - name: Cancel Previous Runs
+              uses: styfle/cancel-workflow-action@0.12.1
+              with:
+                  access_token: ${{ github.token }}
+
+            ################################
+            # Cache system dependencies
+            ################################
+            - name: Cache system dependencies
+              uses: actions/cache@v4
+              id: system-deps-cache
+              env:
+                  cache-name: system-deps
+              with:
+                  path: |
+                      /var/cache/apt/archives/*.deb
+                      ~/.local/lib
+                      ~/.local/include
+                  key: ${{ runner.os }}-${{ env.cache-name }}-v1
+                  restore-keys: |
+                      ${{ runner.os }}-${{ env.cache-name }}-
+                      ${{ runner.os }}-
+
+            ################################
+            # Set up Python
+            ################################
+            - name: Setup Python Environment
+              uses: ./.github/workflows/setup-python.yml
+              with:
+                  python-version: "3.11"
+                  cache-key: "lint"
+
+            ################################
+            # Setup uv
+            ################################
+            - name: Setup uv
+              id: uv-version
+              run: |
+                  # Install uv and keep it installed
+                  curl -LsSf https://astral.sh/uv/install.sh | sh
+                  UV_VERSION=$(/home/runner/.local/bin/uv --version | cut -d' ' -f2)
+                  echo "version=$UV_VERSION" >> $GITHUB_OUTPUT
+                  echo "uv-version=$UV_VERSION"
+                  # Add uv to PATH
+                  echo "/home/runner/.local/bin" >> $GITHUB_PATH
+
+            ################################
+            # Restore Python environment cache
+            ################################
+            - name: Restore Python environment cache
+              id: cache-restore
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                      ~/.local/share/uv
+                  key: ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-${{ hashFiles('pyproject.toml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-
+                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-
+
+            ################################
+            # Setup Python environment
+            ################################
+            - name: Setup Python environment
+              run: |
+                  set -eo pipefail
+                  if [ "${{ steps.cache-restore.outputs.cache-hit }}" != 'true' ]; then
+                    echo "Creating new virtual environment"
+                    uv venv --seed --python 3.11
+                    source .venv/bin/activate
+                    uv pip install -e ".[dev]"
+                  else
+                    echo "Using cached environment with uv ${{ steps.uv-version.outputs.version }}"
+                    source .venv/bin/activate
+                    uv pip list
+                  fi
+
+            ################################
+            # Run Ruff linter
+            ################################
+            - name: Run Ruff linter
+              run: |
+                  source ${{ needs.setup.outputs.venv-path }}/bin/activate
+                  ruff check .
+
+            ################################
+            # Run Ruff formatter
+            ################################
+            - name: Run Ruff formatter
+              run: |
+                  source ${{ needs.setup.outputs.venv-path }}/bin/activate
+                  ruff format --check .
+
+            ################################
+            # Save Python environment cache
+            ################################
+            - name: Save Python environment cache
+              if: always() && steps.cache-restore.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                      ~/.local/share/uv
+                  key: ${{ steps.cache-restore.outputs.cache-primary-key }}

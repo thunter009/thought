@@ -1,4 +1,4 @@
-name: Run Test Suite
+name: Type Check
 
 on:
     push:
@@ -15,23 +15,18 @@ env:
     ACTIONS_STEP_DEBUG: ${{ vars.ACTIONS_STEP_DEBUG }}
 
 jobs:
-    test:
-        name: test_suite
-        runs-on: ${{ matrix.os }}
-        strategy:
-            fail-fast: true
-            matrix:
-                os: ["ubuntu-latest"]
-                python-version: ["3.11"]
+    typecheck:
+        name: Type Check
+        runs-on: ubuntu-latest
 
         steps:
             - name: Setup Python Environment
               uses: ./.github/workflows/setup-python.yml
               with:
-                  python-version: ${{ matrix.python-version }}
-                  cache-key: "tests"
+                  python-version: "3.11"
+                  cache-key: "mypy"
 
-            - name: Run tests
+            - name: Run mypy
               run: |
                   source ${{ needs.setup.outputs.venv-path }}/bin/activate
-                  pytest -v --cov=thought
+                  mypy .

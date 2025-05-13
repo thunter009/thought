@@ -1,0 +1,127 @@
+name: Setup Python Environment
+
+on:
+    workflow_call:
+        inputs:
+            python-version:
+                required: true
+                type: string
+                default: "3.11"
+            cache-key:
+                required: false
+                type: string
+                default: "default"
+        outputs:
+            cache-hit:
+                description: "Whether the cache was hit"
+                value: ${{ jobs.setup.outputs.cache-hit }}
+            venv-path:
+                description: "Path to the virtual environment"
+                value: ${{ jobs.setup.outputs.venv-path }}
+
+jobs:
+    setup:
+        name: Setup Python Environment
+        runs-on: ubuntu-latest
+        outputs:
+            cache-hit: ${{ steps.cache-restore.outputs.cache-hit }}
+            venv-path: ${{ steps.setup-env.outputs.venv-path }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Cancel Previous Runs
+              uses: styfle/cancel-workflow-action@0.12.1
+              with:
+                  access_token: ${{ github.token }}
+
+            - name: Cache system dependencies
+              uses: actions/cache@v4
+              id: system-deps-cache
+              env:
+                  cache-name: system-deps
+              with:
+                  path: |
+                      /var/cache/apt/archives/*.deb
+                      ~/.local/lib
+                      ~/.local/include
+                  key: ${{ runner.os }}-${{ env.cache-name }}-v1
+                  restore-keys: |
+                      ${{ runner.os }}-${{ env.cache-name }}-
+                      ${{ runner.os }}-
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ inputs.python-version }}
+
+            - name: Setup uv
+              id: uv-version
+              run: |
+                  # Install uv and keep it installed
+                  curl -LsSf https://astral.sh/uv/install.sh | sh
+                  UV_VERSION=$(/home/runner/.local/bin/uv --version | cut -d' ' -f2)
+                  echo "version=$UV_VERSION" >> $GITHUB_OUTPUT
+                  echo "uv-version=$UV_VERSION"
+                  # Add uv to PATH
+                  echo "/home/runner/.local/bin" >> $GITHUB_PATH
+
+            - name: Restore Python environment cache
+              id: cache-restore
+              uses: actions/cache/restore@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                      ~/.local/share/uv
+                  key: ${{ runner.os }}-python-env-${{ inputs.python-version }}-uv-${{ steps.uv-version.outputs.version }}-${{ inputs.cache-key }}-${{ hashFiles('pyproject.toml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-python-env-${{ inputs.python-version }}-uv-${{ steps.uv-version.outputs.version }}-${{ inputs.cache-key }}-
+                      ${{ runner.os }}-python-env-${{ inputs.python-version }}-
+
+            - name: Setup Python environment
+              id: setup-env
+              run: |
+                  set -eo pipefail
+                  if [ "${{ steps.cache-restore.outputs.cache-hit }}" != 'true' ]; then
+                    echo "Creating new virtual environment"
+                    uv venv --seed --python ${{ inputs.python-version }}
+                    source .venv/bin/activate
+                    uv pip install -e ".[dev]"
+                  else
+                    echo "Using cached environment with uv ${{ steps.uv-version.outputs.version }}"
+                    source .venv/bin/activate
+                    uv pip list
+                  fi
+                  echo "venv-path=$PWD/.venv" >> $GITHUB_OUTPUT
+
+            - name: Debug environment info
+              if: ${{ env.ACTIONS_STEP_DEBUG == 'true' }}
+              run: |
+                  source .venv/bin/activate
+                  echo "=== Environment Debug Info ==="
+                  echo "PATH: $PATH"
+                  echo "Python location: $(which python3)"
+                  echo "Python version: $(python3 --version)"
+                  echo "UV location: $(which uv)"
+                  echo "UV version: $(uv --version)"
+                  echo "Pip location: $(which pip)"
+                  echo "Pip version: $(pip --version)"
+                  echo "Virtual env location: $VIRTUAL_ENV"
+                  echo "=== Directory Structure ==="
+                  ls -la .venv/bin/
+                  echo "=== Python Packages ==="
+                  uv pip list
+
+            - name: Save Python environment cache
+              if: always() && steps.cache-restore.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                  path: |
+                      .venv
+                      ~/.cache/uv
+                      ~/.local/share/uv
+                  key: ${{ steps.cache-restore.outputs.cache-primary-key }}
