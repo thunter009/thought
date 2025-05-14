@@ -86,7 +86,7 @@ jobs:
                     uv venv --seed --python ${{ matrix.python-version }}
                   fi
                   source .venv/bin/activate
-                  uv sync --extra dev
+                  uv sync --extra dev && uv pip install -e .
 
             - name: Save Python environment cache
               if: always() && steps.cache-restore.outputs.cache-hit != 'true'

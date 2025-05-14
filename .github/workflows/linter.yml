@@ -129,8 +129,7 @@ jobs:
                     uv venv --seed --python 3.11
                   fi
                   source .venv/bin/activate
-                  pip install -e .
-                  uv sync --extra dev
+                  uv sync --extra dev && uv pip install -e .
 
             ################################
             # Run Ruff linter
