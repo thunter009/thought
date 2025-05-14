@@ -35,70 +35,17 @@ jobs:
               with:
                   access_token: ${{ github.token }}
 
-            - name: Cache system dependencies
-              uses: actions/cache@v4
-              id: system-deps-cache
-              env:
-                  cache-name: system-deps
+            - name: Install uv
+              uses: astral-sh/setup-uv@v2
               with:
-                  path: |
-                      /var/cache/apt/archives/*.deb
-                      ~/.local/lib
-                      ~/.local/include
-                  key: ${{ runner.os }}-${{ env.cache-name }}-v1
-                  restore-keys: |
-                      ${{ runner.os }}-${{ env.cache-name }}-
-                      ${{ runner.os }}-
+                  enable-cache: true
+                  cache-dependency-glob: "pyproject.toml"
 
             - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: ${{ matrix.python-version }}
+              run: uv python install
 
-            - name: Setup uv
-              id: uv-version
-              run: |
-                  curl -LsSf https://astral.sh/uv/install.sh | sh
-                  UV_VERSION=$(/home/runner/.local/bin/uv --version | cut -d' ' -f2)
-                  echo "version=$UV_VERSION" >> $GITHUB_OUTPUT
-                  echo "uv-version=$UV_VERSION"
-                  echo "/home/runner/.local/bin" >> $GITHUB_PATH
-
-            - name: Restore Python environment cache
-              id: cache-restore
-              uses: actions/cache/restore@v4
-              with:
-                  path: |
-                      .venv
-                      ~/.cache/uv
-                      ~/.local/share/uv
-                  key: ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-tests-${{ hashFiles('pyproject.toml') }}
-                  restore-keys: |
-                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-uv-${{ steps.uv-version.outputs.version }}-tests-
-                      ${{ runner.os }}-python-env-${{ matrix.python-version }}-
-
-            - name: Setup Python environment
-              id: setup-env
-              run: |
-                  set -eo pipefail
-                  if [ "${{ steps.cache-restore.outputs.cache-hit }}" != 'true' ]; then
-                    echo "Creating new virtual environment"
-                    uv venv --seed --python ${{ matrix.python-version }}
-                  fi
-                  source .venv/bin/activate
-                  uv sync --extra dev && uv pip install -e .
-
-            - name: Save Python environment cache
-              if: always() && steps.cache-restore.outputs.cache-hit != 'true'
-              uses: actions/cache/save@v4
-              with:
-                  path: |
-                      .venv
-                      ~/.cache/uv
-                      ~/.local/share/uv
-                  key: ${{ steps.cache-restore.outputs.cache-primary-key }}
+            - name: Install the project
+              run: uv sync --all-extras --dev
 
             - name: Run tests
-              run: |
-                  source .venv/bin/activate
-                  pytest -v --cov=thought
+              run: uv run pytest -v --cov=thought
