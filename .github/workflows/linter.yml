@@ -82,7 +82,9 @@ jobs:
             # Install the project
             ################################
             - name: Install the project
-              run: uv sync --all-extras --dev
+              run: |
+                  uv sync --all-extras --dev
+                  uv pip install -e .
 
             ################################
             # Run Ruff linter
