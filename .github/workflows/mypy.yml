@@ -17,7 +17,12 @@ env:
 jobs:
     typecheck:
         name: Type Check
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: true
+            matrix:
+                os: ["ubuntu-latest"]
+                python-version: ["3.11"]
 
         steps:
             - name: Checkout
@@ -81,7 +86,7 @@ jobs:
                     uv venv --seed --python 3.11
                   fi
                   source .venv/bin/activate
-                  uv pip install -e .
+                  pip install -e .
                   uv sync --extra dev
 
             - name: Save Python environment cache
