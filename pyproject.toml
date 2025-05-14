@@ -35,6 +35,9 @@ dev = [
     "pre-commit",
     "sphinx",
     "ipykernel",
+    "pandas-stubs",
+    "types-regex",
+    "types-requests-oauthlib",
 ]
 
 [project.scripts]
