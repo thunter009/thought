@@ -62,14 +62,31 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["notion.*"]
+module = ["notion.*", "notion_client.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["recordlinkage.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pytest.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["click.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["dotenv.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

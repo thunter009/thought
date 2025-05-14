@@ -50,4 +50,4 @@ jobs:
                   uv pip install -e .
 
             - name: Run mypy
-              run: uv run mypy src/thought
+              run: uv run mypy

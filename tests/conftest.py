@@ -1,3 +1,5 @@
+"""Test configuration and fixtures."""
+
 import pytest
 
 from thought.client import NotionAPIClient
