@@ -1,14 +1,16 @@
 import copy
+from collections.abc import Callable
 from dataclasses import field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import regex as re
 from dotenv import load_dotenv
 
 
-def load_env():
+def load_env() -> None:
     """
     loads local environment variables
     """
@@ -16,7 +18,7 @@ def load_env():
     load_dotenv(dotenv_path=env_path, verbose=True)
 
 
-def now():
+def now() -> datetime:
     """
     returns current UTC timestamp
     """
@@ -24,11 +26,15 @@ def now():
     return utc_dt
 
 
-def default_field(obj, **kwargs):
+def default_field(obj: Any, **kwargs: Any) -> Callable[..., Any]:
     """
     returns field object that can handle default factory functions properly
     """
-    return field(default_factory=lambda: copy.copy(obj), **kwargs)
+
+    def factory() -> Any:
+        return copy.copy(obj)
+
+    return field(default_factory=factory, **kwargs)  # type: ignore
 
 
 def notion_url_to_uuid(url: str) -> str:
@@ -42,30 +48,40 @@ def notion_url_to_uuid(url: str) -> str:
         result = (
             f"{result[:8]}-{result[8:12]}-{result[12:16]}-{result[16:20]}-{result[20:]}"
         )
-    return result
+        assert isinstance(result, str)
+        return result
+    assert isinstance(url, str)
+    return url
 
 
-def notion_rich_text_to_plain_text(rich_text_list: list) -> str:
+def notion_rich_text_to_plain_text(rich_text_list: list[dict[str, Any]]) -> str:
     """
     Converts a notion rich_text list into a plain text string
     """
-    holder = []
+    holder: list[str] = []
     for part in rich_text_list:
-        holder.append(part["text"]["content"])
-    return "".join(holder)
+        holder.append(str(part["text"]["content"]))
+    result = "".join(holder)
+    assert isinstance(result, str)
+    return result
 
 
-def notion_select_to_plain_text(input_value: list) -> str:
+def notion_select_to_plain_text(
+    input_value: list[dict[str, Any]] | Any,
+) -> list[str] | str:
     """
     Converts a notion rich_text list into a plain text string
     """
     if input_value and isinstance(input_value, list):
-        holder = []
+        holder: list[str] = []
         for part in input_value:
             holder.append(part["name"])
+        assert isinstance(holder, list)
         return holder
 
-    return input_value
+    result = str(input_value)
+    assert isinstance(result, str)
+    return result
 
 
 def notion_clean_column_name(column_name: str) -> str:
@@ -95,18 +111,18 @@ def notion_clean_column_name(column_name: str) -> str:
     is_select = re.search(is_select_regex, column_name)
 
     if is_date:
-        return is_date.group().replace(".date.", "_")
+        return str(is_date.group().replace(".date.", "_"))
     elif is_formula:
-        return re.sub(r"\.formula\.[a-zA-Z0-9_\-#.() ]+", "", is_formula.group())
+        return str(re.sub(r"\.formula\.[a-zA-Z0-9_\-#.() ]+", "", is_formula.group()))
     elif is_select:
-        return re.sub(r"\.select\.[a-zA-Z0-9_\-#.() ]+", "", is_select.group())
+        return str(re.sub(r"\.select\.[a-zA-Z0-9_\-#.() ]+", "", is_select.group()))
     else:
         regex = r"(?<=properties\.)([a-zA-Z0-9_\-#.() \u263a-\U0001f645]+)(?=\.[a-zA-Z0-9_ ]+)"  # noqa E501
         search = re.search(regex, column_name)
-        return search.group() if search else column_name
+        return str(search.group() if search else column_name)
 
 
-def pascal_to_lower_snake(df: pd.DataFrame, column: str) -> str:
+def pascal_to_lower_snake(df: pd.DataFrame, column: str) -> pd.DataFrame:
     df[column] = (
         df[column]
         .replace("QQ", "qq")

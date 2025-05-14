@@ -1,7 +1,6 @@
 import logging
-import re
 import sys
-from pathlib import Path
+from typing import Any
 
 import click
 import pandas as pd
@@ -9,8 +8,8 @@ import pandas as pd
 from thought.client import NotionAPIClient
 from thought.core import CollectionExtension, CollectionViewExtension
 from thought.exceptions import (
-    CollectionMustAlreadyExistException,
-    LoadDestinationNotUniqueException,
+    CollectionMustAlreadyExistError,
+    LoadDestinationNotUniqueError,
 )
 from thought.service import Registry
 from thought.settings import (
@@ -20,11 +19,7 @@ from thought.settings import (
     NOTION_SERVICES_DIRECTORY,
 )
 from thought.utils import (
-    notion_clean_column_name,
-    notion_rich_text_to_plain_text,
-    notion_select_to_plain_text,
     notion_url_to_uuid,
-    now,
     pascal_to_lower_snake,
 )
 
@@ -46,7 +41,11 @@ logger = logging.getLogger()
 class Config:
     """Configuration Object"""
 
-    def add_url_prefix(self, url):
+    service_config_directory: str
+    registry: Any
+    client: Any
+
+    def add_url_prefix(self, url: str) -> str:
         """Adds a notion.so prefex to notion URLS"""
         prefix = "https://www.notion.so/"
         return prefix + url
@@ -63,7 +62,7 @@ CONTEXT = click.make_pass_decorator(Config, ensure=True)
     "Defaults to '/services/'",
 )
 @CONTEXT
-def cli(ctx, service_config_directory):
+def cli(ctx: Config, service_config_directory: str) -> None:
     """
     Thought - Notion CLI
     """
@@ -82,7 +81,7 @@ def cli(ctx, service_config_directory):
     "Defaults to all collection object properties",
 )
 @CONTEXT
-def dedupe(ctx, collection_url: str, field):
+def dedupe(ctx: Config, collection_url: str, field: tuple[str, ...]) -> None:
     """
     Removes dupelicate items in a specified collection view
 
@@ -112,7 +111,7 @@ def dedupe(ctx, collection_url: str, field):
     "the multi-select field",
 )
 @CONTEXT
-def sort(ctx, url, field, sort_multiselect_values) -> None:
+def sort(ctx: Config, url: str, field: str, sort_multiselect_values: bool) -> None:
     """
     Sorts a provided field's attributes in alpha-numeric order
 
@@ -158,12 +157,13 @@ def sort(ctx, url, field, sort_multiselect_values) -> None:
 @click.option(
     "--target_collection",
     default=NOTION_SERVICES_DIRECTORY,
-    help="The target page you want the output of the sync action to persist in. "
-    "Will create a Collection in this object with the service name as the title.",
+    help=(
+        "The target page you want the output of the sync action to persist in. "
+        "Will create a Collection in this object with the service name as the title."
+    ),
 )
-# @click.option('--service_definition', default=SERVICES_CONFIGURATION_PATH, help='The target collection you want the output of the sync action to persist in')
 @CONTEXT
-def sync(ctx, service: str, action: str, target_collection: str) -> None:
+def sync(ctx: Config, service: str, action: str, target_collection: str) -> None:
     """Sync data from an external service to a Notion collection.
 
     This function retrieves data from a specified service using a given action,
@@ -183,9 +183,9 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 
     Raises
     ------
-    CollectionMustAlreadyExistException
+    CollectionMustAlreadyExistError
         If the target collection does not exist
-    LoadDestinationNotUniqueException
+    LoadDestinationNotUniqueError
         If multiple collections match the target name
 
     Example
@@ -219,13 +219,13 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
     collection = [x for x in page.children if collection_name == x.title]
 
     if not collection:
-        # TODO: create new collection if nothing matches our {service}_{action} nameing pattern -- blocked by API support as of 8/11/20
-        raise CollectionMustAlreadyExistException(
-            f"{collection_name} must already exist"
-        )
+        # TODO: create new collection if nothing matches our {service}_{action}
+        # naming pattern
+        # -- blocked by API support as of 8/11/20
+        raise CollectionMustAlreadyExistError(f"{collection_name} must already exist")
 
     if len(collection) > 1:
-        raise LoadDestinationNotUniqueException(
+        raise LoadDestinationNotUniqueError(
             f"Target collection must be unique: remove existing collection "
             f"{collection_name} or pick a new function name"
         )
@@ -256,7 +256,7 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 @click.option(
     "-f",
     "--filter",
-    type=list,
+    type=dict,
     help="The filter to apply to the target database",
     default={},
 )
@@ -269,152 +269,44 @@ def sync(ctx, service: str, action: str, target_collection: str) -> None:
 )
 @CONTEXT
 def tojson(
-    ctx,
+    ctx: Config,
     database_url: str,
     _output: str,
-    columns: list,
+    columns: list[str] | None,
+    filter: dict[str, Any],
     lower_snake_case: str,
 ) -> None:
-    """Export a Notion database to JSON format.
+    """
+    Exports a Notion database to a JSON file
 
-    Exports the contents of a Notion database to a JSON file, with options to
-    filter columns and transform data formats. The function handles pagination
-    and data cleaning automatically.
-
-    Parameters
-    ----------
-    ctx : Context
-        Click context object containing client and registry
-    database_url : str
-        URL of the Notion database to export
-    _output : str
-        Directory path where the JSON file will be saved
-    columns : list
-        List of column names to include in the export
-    lower_snake_case : str
-        Column name to convert to lower snake case format
-
-    Exceptions
-    ----------
-    Exception
-        Raised if there is an error writing the output file
-
-    Example
-    -------
-    >>> thought tojson "https://www.notion.so/workspace/database_id" -o ./exports
+    Arguments
+    ---------
+    database_url: A URL to a Notion database
     """
     client = ctx.client
-
     # convert raw URL --> UUID
     uuid = notion_url_to_uuid(database_url)
-
-    # construct query from CLI parameters
-    # TODO: pass filters via CLI params
-
     query = {
         "database_id": uuid,
-        "filter": {"property": "status", "select": {"equals": "PROD"}},
+        "filter": filter,
     }
 
     # send query and get back response JSON
-    # result = client.databases.query(**query)
     result = client.query(query)
-    # result = notion_query(client, query)
 
-    # handle pagination
-    # TODO: make this a recursive async function
-    results = []
-    has_more = result["has_more"]
-    results.append(result["results"])
-    while has_more:
-        cursor = {"start_cursor": result["next_cursor"]}
-        new_query = query | cursor
-        result = client.query(new_query)
-        results.append(result["results"])
-        has_more = result["has_more"]
+    # convert response to pandas dataframe
+    df = pd.DataFrame(result["results"])
 
-    # filter down JSON response to export ready object
-    holder = []
-    for r in results:
-        # convert dict to df
-        df = pd.json_normalize(r)
+    # if columns are specified, filter to just those columns
+    if columns:
+        df = df[columns]
 
-        # handle all columns case
-        if len(columns) == 0:
-            input_columns = list(df.columns)
-
-        # select only provided columns
-        else:
-            input_columns = [
-                x for x in df.columns for y in columns if f"properties.{y}" in x
-            ]
-
-        # TODO: add click option to include title column object + flatten it
-        reduced_columns = [
-            x
-            for x in input_columns
-            if all(
-                [
-                    not re.search(r"\.id$", x),
-                    not re.search(r"\.type$", x),
-                    not re.search(r"\.color$", x),
-                    not re.search(r"\.title$", x),
-                    not re.search(r"\.rollup\.", x),
-                    not re.search(r"\.last_edited_by$", x),
-                    not re.search(r"\.created_by$", x),
-                    "properties." in x,
-                ]
-            )
-        ]
-        df = df[reduced_columns]
-        df = df.loc[:, ~df.columns.duplicated()].copy()
-
-        # handle rich_text fields
-        # TODO: make this a function
-        rich_text_columns = [x for x in df.columns if "rich_text" in x]
-
-        if rich_text_columns:
-            for rt_col in rich_text_columns:
-                df[rt_col] = df[rt_col].apply(notion_rich_text_to_plain_text)
-
-        # handle tag fields
-        # TODO: make this a function
-
-        tag_columns = [
-            x
-            for x in df.columns
-            if any(
-                [
-                    "multi_select" in x,
-                    "select" in x,
-                ]
-            )
-        ]
-
-        if tag_columns:
-            for col in tag_columns:
-                df[col] = df[col].apply(notion_select_to_plain_text)
-
-        # change column names to "pure" column names without notion data structure cruft
-        new_column_names = {x: notion_clean_column_name(x) for x in df.columns}
-        df.rename(columns=new_column_names, inplace=True)
-
-        # drops subtly duplicate columns from entering the dataframe
-        df.dropna(axis=1, how="all", inplace=True)
-
-        holder.append(df)
-
-    # write object to file
-    path = Path(_output) / Path(f"{uuid}-{now()}.json")
-    df = pd.concat(holder)
-
+    # if lower_snake_case is specified, convert the specified column to lower_snake_case
     if lower_snake_case:
-        df = pascal_to_lower_snake(df, "metric")
-        df = pascal_to_lower_snake(df, "metric_v2")
-    try:
-        df.to_json(path, orient="records")
-    except Exception as e:
-        logger.debug("Something went wrong writing out %s: %s", str(path), str(e))
+        df = pascal_to_lower_snake(df, lower_snake_case)
+
+    # save to JSON
+    df.to_json(f"{_output}/{uuid}.json", orient="records")
 
 
 @cli.command("tocsv")
@@ -438,7 +330,7 @@ def tojson(
 @click.option(
     "-f",
     "--filter",
-    type=list,
+    type=dict,
     help="The filter to apply to the target database",
     default={},
 )
@@ -451,42 +343,44 @@ def tojson(
 )
 @CONTEXT
 def tocsv(
-    ctx,
+    ctx: Config,
     database_url: str,
     _output: str,
-    columns: list,
-    filter: dict,
+    columns: list[str] | None,
+    filter: dict[str, Any],
     lower_snake_case: str,
 ) -> None:
     """
-    Exports a database view to CSV format.
+    Exports a Notion database to a CSV file
 
-    Exports the contents of a Notion database to a CSV file, with options to
-    filter columns and transform data formats. The function handles pagination
-    and data cleaning automatically.
-
-    Parameters
-    ----------
-    ctx : Context
-        Click context object containing client and registry
-    database_url : str
-        URL to the Notion database or view to export
-    _output : str
-        Directory path where the CSV file will be saved
-    columns : list
-        List of column names to include in the export. If empty, exports all
-        columns
-    filter : dict
-        Filter criteria to apply to the database query
-    lower_snake_case : str
-        Column name to convert to lower snake case format
-
-    Example
-    -------
-    >>> thought tocsv "https://www.notion.so/workspace/database_id?v=view_id"
-    >>>     --columns "Name" "Status" --output "./exports"
+    Arguments
+    ---------
+    database_url: A URL to a Notion database
     """
-    # Rest of implementation remains unchanged...
+    client = ctx.client
+    # convert raw URL --> UUID
+    uuid = notion_url_to_uuid(database_url)
+    query = {
+        "database_id": uuid,
+        "filter": filter,
+    }
+
+    # send query and get back response JSON
+    result = client.query(query)
+
+    # convert response to pandas dataframe
+    df = pd.DataFrame(result["results"])
+
+    # if columns are specified, filter to just those columns
+    if columns:
+        df = df[columns]
+
+    # if lower_snake_case is specified, convert the specified column to lower_snake_case
+    if lower_snake_case:
+        df = pascal_to_lower_snake(df, lower_snake_case)
+
+    # save to CSV
+    df.to_csv(f"{_output}/{uuid}.csv", index=False)
 
 
 if __name__ == "__main__":

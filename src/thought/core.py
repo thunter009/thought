@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -6,7 +6,7 @@ import pandas as pd
 from notion.collection import Collection, CollectionView
 from recordlinkage import Compare, Index
 
-from thought.utils import default_field, now
+from thought.utils import now
 
 
 @dataclass
@@ -15,7 +15,7 @@ class Metadata:
     The Metadata object. Contains helper functions and generalized metadata
     """
 
-    run_time: datetime = default_field(now(), init=False, repr=False)
+    run_time: datetime = field(default_factory=now, init=False, repr=False)
 
 
 @dataclass
@@ -26,14 +26,14 @@ class CollectionExtension:
     """
 
     collection: Collection
-    metadata: Metadata = default_field(Metadata(), init=False, repr=False)
+    metadata: Metadata = field(default_factory=Metadata, init=False, repr=False)
 
     def dedupe(
         self,
         dataframe: pd.DataFrame | None = None,
-        comparison_fields: list[Any] | None = None,
+        comparison_fields: list[str] | None = None,
         keep_first: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> pd.DataFrame:
         """
         Function that dedupes an input dataframe
@@ -56,11 +56,11 @@ class CollectionExtension:
         A pandas dataframe with duplicated records removed
         """
         # if dataframe argument not passed, use internal object records
-        if not dataframe:
+        if dataframe is None:
             dataframe = self.asdataframe()
 
         # if comparison fields defaults to all fields if not specified
-        if not comparison_fields:
+        if comparison_fields is None:
             comparison_fields = dataframe.columns.to_list()
 
         # Indexation step
@@ -72,8 +72,8 @@ class CollectionExtension:
         # Comparison step
         compare_cl = Compare()
         # TODO: add flexability for different comparison types here
-        for field in comparison_fields:
-            compare_cl.exact(field, field, label=field)
+        for cmp_field in comparison_fields:
+            compare_cl.exact(cmp_field, cmp_field, label=cmp_field)
         features = compare_cl.compute(candidate_links, dataframe)
 
         # Classification step
@@ -91,7 +91,7 @@ class CollectionExtension:
         Returns a Collection's Block rows as a pandas data frame using the
         get_all_properties function.
         """
-        holder = []
+        holder: list[dict[str, Any]] = []
         rows = self.collection.get_rows()
         for block in rows:
             # TODO: add ability to preserve objects here
@@ -109,7 +109,7 @@ class CollectionViewExtension:
     """
 
     view: CollectionView
-    metadata: Metadata = default_field(Metadata(), init=False, repr=False)
+    metadata: Metadata = field(default_factory=Metadata, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # import ipdb; ipdb.set_trace()
@@ -119,7 +119,8 @@ class CollectionViewExtension:
         """
         Get's a Collection View's schema by accessing the parent's collection object
         """
-        return self.view.parent.collection.get_schema_properties()
+        schema = self.view.parent.collection.get_schema_properties()
+        return dict(schema)  # Ensure we return a dict
 
     def sort(self, field: str, sort_multiselect_values: bool = False) -> None:
         """
