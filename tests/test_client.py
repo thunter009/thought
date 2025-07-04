@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from notion_client import Client as NotionClient
 
 from thought.client import NotionAPIClient
 
@@ -13,8 +12,10 @@ class TestNotionAPIClient:
     Note: these are not integration tests using this API client
     """
 
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_get_client(self, mock_notion_client):
+    def test_get_client(mock_notion_client):
         """
         Test creating a client with valid token
         """
@@ -28,19 +29,34 @@ class TestNotionAPIClient:
         actual_client = client.get_client(test_token)
 
         # Verify the client was created with correct token
-        mock_notion_client.assert_called_once_with(auth=test_token)
-        assert isinstance(actual_client, NotionClient)
+        # The mock should be called twice: once during init, once with test_token
+        calls = mock_notion_client.call_args_list
+        expected_call_count = 2
+        assert len(calls) == expected_call_count
+        assert calls[0] == ((), {"auth": "mocked_token"})  # from __init__
+        assert calls[1] == ((), {"auth": "test_token"})  # from get_client call
+        # The actual_client should be our mock instance
+        assert actual_client is mock_client_instance
 
-    def test_get_client_no_token(self):
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
+    @patch("thought.client.NotionClient")
+    def test_get_client_no_token(mock_notion_client):
         """
         Test client creation with no token raises ValueError
         """
+        # Setup mock
+        mock_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_client_instance
+
         client = NotionAPIClient()
         with pytest.raises(ValueError, match="Notion access token is required"):
             client.get_client(None)
 
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_client_initialization(self, mock_notion_client):
+    def test_client_initialization(mock_notion_client):
         """
         Test client initialization behavior
         """
@@ -52,13 +68,24 @@ class TestNotionAPIClient:
         client1 = NotionAPIClient()
         assert client1.client is not None
 
-        # Test second initialization (should reuse existing client)
+        # Test second initialization (each instance gets its own client)
         client2 = NotionAPIClient()
-        assert client2.client is client1.client
-        mock_notion_client.assert_called_once()
+        assert client2.client is not None
 
+        # Since we changed from class variable to instance variable,
+        # each instance should have its own client
+        # Both clients should be the same mock instance but they're separate instances
+        expected_call_count = 2
+        assert mock_notion_client.call_count == expected_call_count
+        # Both calls should be with the mocked token
+        calls = mock_notion_client.call_args_list
+        assert calls[0] == ((), {"auth": "mocked_token"})
+        assert calls[1] == ((), {"auth": "mocked_token"})
+
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_query(self, mock_notion_client):
+    def test_query(mock_notion_client):
         """
         Test successful query to the Notion API
         """
@@ -76,8 +103,10 @@ class TestNotionAPIClient:
         mock_client_instance.databases.query.assert_called_once_with(**test_query)
         assert isinstance(result, dict)
 
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_query_with_complex_parameters(self, mock_notion_client):
+    def test_query_with_complex_parameters(mock_notion_client):
         """
         Test query with complex parameters (filters, sorts, etc.)
         """
@@ -107,8 +136,10 @@ class TestNotionAPIClient:
         assert "has_more" in result
         assert "next_cursor" in result
 
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_query_error_handling(self, mock_notion_client):
+    def test_query_error_handling(mock_notion_client):
         """
         Test error handling in query method
         """
@@ -124,8 +155,10 @@ class TestNotionAPIClient:
         with pytest.raises(Exception, match="API Error"):
             client.query(test_query)
 
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
-    def test_query_with_invalid_response(self, mock_notion_client):
+    def test_query_with_invalid_response(mock_notion_client):
         """
         Test handling of invalid response from API
         """

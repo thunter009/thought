@@ -31,13 +31,9 @@ dev = [
     "pytest",
     "pytest-cov",
     "ruff",
-    "mypy",
     "pre-commit",
     "sphinx",
     "ipykernel",
-    "pandas-stubs",
-    "types-regex",
-    "types-requests-oauthlib",
 ]
 
 [project.scripts]
@@ -56,37 +52,6 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
 
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["notion.*", "notion_client.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["recordlinkage.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["pytest.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["click.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["dotenv.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

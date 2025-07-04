@@ -16,8 +16,8 @@ def notion_api_client() -> NotionAPIClient:
 @pytest.fixture()
 def notion_api_client_client(
     notion_api_client: NotionAPIClient,
-) -> NotionAPIClient.client:
+):
     """
-    Fixture: BigQueryClient.client
+    Fixture: NotionAPIClient.client
     """
     return notion_api_client.client
