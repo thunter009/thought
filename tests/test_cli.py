@@ -50,6 +50,34 @@ def test_export_command_help():
     assert result.exit_code == 0
 
 
+def test_old_commands_removed():
+    """
+    Test that old tocsv and tojson commands are no longer available
+    """
+    runner = CliRunner()
+
+    # Test that tocsv command no longer exists
+    result = runner.invoke(cli, ["tocsv", "--help"])
+    assert result.exit_code != 0
+    assert "No such command" in result.output
+
+    # Test that tojson command no longer exists
+    result = runner.invoke(cli, ["tojson", "--help"])
+    assert result.exit_code != 0
+    assert "No such command" in result.output
+
+
+def test_export_command_in_help():
+    """
+    Test that export command appears in main CLI help
+    """
+    runner = CliRunner()
+
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "export" in result.output
+
+
 def test_extract_property_value():
     """
     Test the _extract_property_value function with different property types

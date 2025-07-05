@@ -83,20 +83,23 @@ thought sort "https://notion.so/your-collection-url" --field "tags" --sort_multi
 
 ### Data Export
 
-Export databases to JSON or CSV:
+Export databases to JSON or CSV using the unified export command:
 
 ```bash
-# Export to JSON
-thought tojson "https://notion.so/your-database-url" --output="./exports/"
+# Export to CSV (default)
+thought export "https://notion.so/your-database-url" --output="./exports/"
 
-# Export to CSV
-thought tocsv "https://notion.so/your-database-url" --output="./exports/"
+# Export to JSON
+thought export "https://notion.so/your-database-url" --type json --output="./exports/"
 
 # Export specific columns
-thought tocsv "https://notion.so/your-database-url" --columns "title" --columns "url"
+thought export "https://notion.so/your-database-url" --columns "title" --columns "url"
+
+# Export to CSV with specific columns
+thought export "https://notion.so/your-database-url" --type csv --columns "title" --columns "url"
 
 # Convert column names to snake_case
-thought tocsv "https://notion.so/your-database-url" --lower-snake-case "Created Time"
+thought export "https://notion.so/your-database-url" --lower-snake-case "Created Time"
 ```
 
 ### Service Integration
