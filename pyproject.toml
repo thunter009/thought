@@ -1,6 +1,59 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta:__legacy__"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.black]
+[tool.hatch.build.targets.wheel]
+packages = ["src/thought"]
+
+[project]
+name = "thought"
+version = "0.1.0"
+description = "Notion CLI using Notion's API"
+authors = [{ name = "Tom Hunter", email = "tom@hunter.com" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "click",
+    "python-dotenv",
+    "notion",
+    "pandas",
+    "recordlinkage",
+    "requests-oauthlib",
+    "pytoml",
+    "requests",
+    "notion-client",
+    "regex",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "pre-commit",
+    "sphinx",
+    "ipykernel",
+]
+
+[project.scripts]
+thought = "thought.cli:cli"
+
+[tool.ruff]
 line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=thought"

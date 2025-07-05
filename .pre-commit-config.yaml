@@ -1,22 +1,26 @@
 ---
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v2.3.0
+      rev: v5.0.0
       hooks:
           - id: check-yaml
+          - id: check-toml
+          - id: check-json
+          - id: check-merge-conflict
+          - id: check-case-conflict
+          - id: check-docstring-first
+          - id: check-symlinks
+          - id: debug-statements
           - id: trailing-whitespace
             exclude_types: [csv, json]
-          # - id: flake8
-    - repo: https://github.com/Madoshakalaka/pipenv-setup
-      rev: v3.2.0
-      hooks:
-          - id: pipenv-setup
-            args: [--dev, --pipfile]
-            additional_dependencies:
-                - vistir==0.6.1
-                - black
+          - id: end-of-file-fixer
+            exclude: tests(/\w*)*/|scripts(/\w*)*/|Dockerfile|(/\w*)*.ini|(/\w*)*.toml|(/\w*)*.yml|(/\w*)*.in|(/\w*)*.ipynb
+            exclude_types: [csv, json]
 
-    - repo: https://github.com/ambv/black
-      rev: 22.10.0
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.12.2
       hooks:
-          - id: black
+          - id: ruff
+            args: [--fix]
+          - id: ruff-format
+            args: [--check, .]

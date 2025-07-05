@@ -1,14 +1,17 @@
-class ServiceNotRegisteredException(BaseException):
-    pass
+"""Custom exceptions for the thought package."""
 
 
-class CredentialsNotAuthorizedException(BaseException):
-    pass
+class ServiceNotRegisteredError(Exception):
+    """Raised when a service is not properly registered in the registry."""
 
 
-class LoadDestinationNotUniqueException(BaseException):
-    pass
+class CredentialsNotAuthorizedError(Exception):
+    """Raised when credentials are not properly authorized."""
 
 
-class CollectionMustAlreadyExistException(BaseException):
-    pass
+class LoadDestinationNotUniqueError(Exception):
+    """Raised when the load destination is not unique."""
+
+
+class CollectionMustAlreadyExistError(Exception):
+    """Raised when a collection must already exist but doesn't."""
