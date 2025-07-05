@@ -24,7 +24,7 @@ jobs:
       fail-fast: true
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout
@@ -73,6 +73,8 @@ jobs:
           echo "✓ Integration tests passed"
 
       - name: Run Specific Export Tests
+        env:
+          NOTION_ACCESS_TOKEN: "fake-token-for-testing"
         run: |
           uv run pytest tests/test_cli.py::test_export_command_csv -v
           uv run pytest tests/test_cli.py::test_export_command_json -v

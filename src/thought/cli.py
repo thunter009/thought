@@ -91,7 +91,14 @@ class Config:
 
     service_config_directory: str
     registry: Any
-    client: Any
+    _client: Any = None
+
+    @property
+    def client(self) -> Any:
+        """Lazy initialization of Notion API client"""
+        if self._client is None:
+            self._client = NotionAPIClient()
+        return self._client
 
     def add_url_prefix(self, url: str) -> str:
         """Adds a notion.so prefex to notion URLS"""
@@ -116,7 +123,8 @@ def cli(ctx: Config, service_config_directory: str) -> None:
     """
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
-    ctx.client = NotionAPIClient()
+    # Initialize client lazily - only when actually needed
+    ctx._client = None
 
 
 @cli.command("dedupe")

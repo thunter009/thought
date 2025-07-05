@@ -78,6 +78,23 @@ def test_export_command_in_help():
     assert "export" in result.output
 
 
+def test_cli_help_without_token():
+    """
+    Test that CLI help works without Notion token (lazy initialization)
+    """
+    runner = CliRunner()
+
+    # Test main help without token
+    result = runner.invoke(cli, ["--help"], env={})
+    assert result.exit_code == 0
+    assert "Thought - Notion CLI" in result.output
+
+    # Test export command help without token
+    result = runner.invoke(cli, ["export", "--help"], env={})
+    assert result.exit_code == 0
+    assert "Exports a Notion database" in result.output
+
+
 def test_extract_property_value():
     """
     Test the _extract_property_value function with different property types
