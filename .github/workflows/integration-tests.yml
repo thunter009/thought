@@ -1,0 +1,81 @@
+---
+## Integration Tests for Export Command ##
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+env:
+  ACTIONS_RUNNER_DEBUG: ${{ vars.ACTIONS_RUNNER_DEBUG }}
+  ACTIONS_STEP_DEBUG: ${{ vars.ACTIONS_STEP_DEBUG }}
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install the project
+        run: |
+          uv sync --all-extras --dev
+          uv pip install -e .
+
+      - name: Test CLI Help
+        run: |
+          uv run thought --help
+          uv run thought export --help
+
+      - name: Test Export Command Integration
+        run: |
+          # Test that old commands are no longer available
+          if uv run thought tocsv --help 2>/dev/null; then
+            echo "ERROR: tocsv command should not exist"
+            exit 1
+          fi
+
+          if uv run thought tojson --help 2>/dev/null; then
+            echo "ERROR: tojson command should not exist"
+            exit 1
+          fi
+
+          echo "✓ Old commands properly removed"
+          echo "✓ Integration tests passed"
+
+      - name: Run Specific Export Tests
+        env:
+          NOTION_ACCESS_TOKEN: "fake-token-for-testing"
+        run: |
+          uv run pytest tests/test_cli.py::test_export_command_csv -v
+          uv run pytest tests/test_cli.py::test_export_command_json -v
+          uv run pytest tests/test_cli.py::test_old_commands_removed -v

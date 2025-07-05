@@ -108,3 +108,5 @@ ENV/
 *.json
 
 *.csv
+
+*.html

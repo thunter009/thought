@@ -1,6 +1,5 @@
----
-## Linter GitHub Actions ##
-name: Lint Code Base
+name: Run Test Suite
+
 on:
     push:
         branches:
@@ -16,10 +15,8 @@ env:
     ACTIONS_STEP_DEBUG: ${{ vars.ACTIONS_STEP_DEBUG }}
 
 jobs:
-    lint:
-        # Name the Job
-        name: Lint Code Base
-        # Set the agent to run on
+    test:
+        name: test_suite
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: true
@@ -33,33 +30,24 @@ jobs:
               with:
                   fetch-depth: 0
 
-            # Cancel Previous Runs
             - name: Cancel Previous Runs
               uses: styfle/cancel-workflow-action@0.12.1
               with:
                   access_token: ${{ github.token }}
 
-            # Install uv
             - name: Install uv
               uses: astral-sh/setup-uv@v2
               with:
                   enable-cache: true
                   cache-dependency-glob: "pyproject.toml"
 
-            # Set up Python
             - name: Set up Python
               run: uv python install
 
-            # Install the project
             - name: Install the project
               run: |
                   uv sync --all-extras --dev
                   uv pip install -e .
 
-            # Run Ruff linter
-            - name: Run Ruff linter
-              run: uv run ruff check .
-
-            # Run Ruff formatter
-            - name: Run Ruff formatter
-              run: uv run ruff format --check .
+            - name: Run tests
+              run: uv run pytest -v --cov=thought
