@@ -23,6 +23,54 @@ from thought.utils import (
     pascal_to_lower_snake,
 )
 
+
+def _extract_property_value(prop_data: dict) -> Any:
+    """Extract value from a Notion property."""
+    prop_type = prop_data["type"]
+
+    # Define mapping of property types to their extraction logic
+    extractors = {
+        "title": lambda: (
+            prop_data["title"][0]["text"]["content"] if prop_data["title"] else ""
+        ),
+        "rich_text": lambda: (
+            prop_data["rich_text"][0]["text"]["content"]
+            if prop_data["rich_text"]
+            else ""
+        ),
+        "number": lambda: prop_data["number"],
+        "select": lambda: prop_data["select"]["name"] if prop_data["select"] else "",
+        "multi_select": lambda: [opt["name"] for opt in prop_data["multi_select"]],
+        "date": lambda: prop_data["date"]["start"] if prop_data["date"] else "",
+        "checkbox": lambda: prop_data["checkbox"],
+        "url": lambda: prop_data["url"],
+        "email": lambda: prop_data["email"],
+        "phone_number": lambda: prop_data["phone_number"],
+    }
+
+    return extractors.get(prop_type, lambda: str(prop_data))()
+
+
+def _extract_notion_properties(api_results: list[dict]) -> list[dict]:
+    """Extract and flatten Notion properties from API results."""
+    rows = []
+    for item in api_results:
+        row = {
+            "id": item["id"],
+            "created_time": item["created_time"],
+            "last_edited_time": item["last_edited_time"],
+            "url": item["url"],
+        }
+
+        # Extract properties and flatten them
+        for prop_name, prop_data in item["properties"].items():
+            row[prop_name] = _extract_property_value(prop_data)
+
+        rows.append(row)
+
+    return rows
+
+
 FILE_NAME = __name__
 logging.basicConfig(
     level=logging.INFO,
@@ -235,7 +283,7 @@ def sync(ctx: Config, service: str, action: str, target_collection: str) -> None
     service_instance.load(data, collection)
 
 
-@cli.command("tojson")
+@cli.command("export")
 @click.argument("database_url")
 @click.option(
     "-o",
@@ -248,7 +296,6 @@ def sync(ctx: Config, service: str, action: str, target_collection: str) -> None
 @click.option(
     "-c",
     "--columns",
-    type=str,
     help="The columns to export from the target database",
     multiple=True,
     default=None,
@@ -258,129 +305,84 @@ def sync(ctx: Config, service: str, action: str, target_collection: str) -> None
     "--filter",
     type=dict,
     help="The filter to apply to the target database",
-    default={},
-)
-@click.option(
-    "-lsc",
-    "--lower-snake-case",
-    type=str,
-    help="Changes the output for a provided column to lower_snake_case",
-    default={},
-)
-@CONTEXT
-def tojson(
-    ctx: Config,
-    database_url: str,
-    _output: str,
-    columns: list[str] | None,
-    filter: dict[str, Any],
-    lower_snake_case: str,
-) -> None:
-    """
-    Exports a Notion database to a JSON file
-
-    Arguments
-    ---------
-    database_url: A URL to a Notion database
-    """
-    client = ctx.client
-    # convert raw URL --> UUID
-    uuid = notion_url_to_uuid(database_url)
-    query = {
-        "database_id": uuid,
-        "filter": filter,
-    }
-
-    # send query and get back response JSON
-    result = client.query(query)
-
-    # convert response to pandas dataframe
-    df = pd.DataFrame(result["results"])
-
-    # if columns are specified, filter to just those columns
-    if columns:
-        df = df[columns]
-
-    # if lower_snake_case is specified, convert the specified column to lower_snake_case
-    if lower_snake_case:
-        df = pascal_to_lower_snake(df, lower_snake_case)
-
-    # save to JSON
-    df.to_json(f"{_output}/{uuid}.json", orient="records")
-
-
-@cli.command("tocsv")
-@click.argument("database_url")
-@click.option(
-    "-o",
-    "--output",
-    "_output",
-    type=str,
-    help="The output path to save the exported data to",
-    default=".",
-)
-@click.option(
-    "-c",
-    "--columns",
-    type=str,
-    help="The columns to export from the target database",
-    multiple=True,
     default=None,
 )
 @click.option(
-    "-f",
-    "--filter",
-    type=dict,
-    help="The filter to apply to the target database",
-    default={},
-)
-@click.option(
     "-lsc",
     "--lower-snake-case",
     type=str,
     help="Changes the output for a provided column to lower_snake_case",
-    default={},
+    default=None,
+)
+@click.option(
+    "-t",
+    "--type",
+    "file_type",
+    type=click.Choice(["csv", "json"]),
+    help="The file type to export to",
+    default="csv",
 )
 @CONTEXT
-def tocsv(
+def export(
     ctx: Config,
     database_url: str,
     _output: str,
     columns: list[str] | None,
-    filter: dict[str, Any],
-    lower_snake_case: str,
+    **options,
 ) -> None:
     """
-    Exports a Notion database to a CSV file
+    Exports a Notion database to CSV or JSON file
 
     Arguments
     ---------
     database_url: A URL to a Notion database
     """
     client = ctx.client
+    filter_param = options.get("filter")
+    lower_snake_case = options.get("lower_snake_case")
+    file_type = options.get("file_type", "csv")
+
     # convert raw URL --> UUID
     uuid = notion_url_to_uuid(database_url)
     query = {
         "database_id": uuid,
-        "filter": filter,
     }
 
+    # Only add filter if it's not empty
+    if filter_param:
+        query["filter"] = filter_param
+
     # send query and get back response JSON
-    result = client.query(query)
+    try:
+        result = client.query(query)
+    except Exception as e:
+        print(f"Error querying database with ID: {uuid}")
+        print(f"Original URL: {database_url}")
+        print(f"Extracted database ID: {uuid}")
+        print("Make sure:")
+        print("1. The URL is a direct link to a Notion database (not a page or view)")
+        print("2. Your integration has access to this database")
+        print("3. The database is shared with your integration")
+        print(f"Original error: {e}")
+        raise
 
     # convert response to pandas dataframe
-    df = pd.DataFrame(result["results"])
+    rows = _extract_notion_properties(result["results"])
+    df = pd.DataFrame(rows)
 
     # if columns are specified, filter to just those columns
     if columns:
-        df = df[columns]
+        df = df[list(columns)]
 
     # if lower_snake_case is specified, convert the specified column to lower_snake_case
     if lower_snake_case:
         df = pascal_to_lower_snake(df, lower_snake_case)
 
-    # save to CSV
-    df.to_csv(f"{_output}/{uuid}.csv", index=False)
+    # save to specified file type
+    if file_type == "csv":
+        df.to_csv(f"{_output}/{uuid}.csv", index=False)
+    elif file_type == "json":
+        df.to_json(f"{_output}/{uuid}.json", orient="records")
 
 
 if __name__ == "__main__":

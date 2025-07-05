@@ -50,7 +50,11 @@ thought --help
 thought dedupe "https://notion.so/your-collection-url"
 thought sort "https://notion.so/your-collection-url" --field "tags"
 thought sync instapaper bookmarks --target_collection="page_url"
-thought tojson "https://notion.so/your-database-url" --output="./exports/"
+
+# Export commands (replaces tojson and tocsv)
+thought export "https://notion.so/your-database-url" --output="./exports/"
+thought export "https://notion.so/your-database-url" --type json --columns "Name" --columns "Status"
+thought export "https://notion.so/your-database-url" --type csv --columns "Name"
 ```
 
 ## Architecture
