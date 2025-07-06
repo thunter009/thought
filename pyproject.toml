@@ -7,7 +7,7 @@ packages = ["src/thought"]
 
 [project]
 name = "thought"
-version = "0.1.0"
+version = "0.2.0"
 description = "Notion CLI using Notion's API"
 authors = [{ name = "Tom Hunter", email = "tom@hunter.com" }]
 license = { text = "MIT" }
@@ -27,14 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "pre-commit",
-    "sphinx",
-    "ipykernel",
-]
+dev = ["pytest", "pytest-cov", "ruff", "pre-commit", "sphinx", "ipykernel"]
 
 [project.scripts]
 thought = "thought.cli:cli"
