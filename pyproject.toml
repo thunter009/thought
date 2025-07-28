@@ -24,6 +24,8 @@ dependencies = [
     "requests",
     "notion-client",
     "regex",
+    "python-frontmatter",
+    "mistune",
 ]
 
 [project.optional-dependencies]

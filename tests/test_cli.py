@@ -50,6 +50,186 @@ def test_export_command_help():
     assert result.exit_code == 0
 
 
+def test_import_command_help():
+    """
+    Test: thought import --help
+    """
+    runner = CliRunner()
+
+    result = runner.invoke(
+        cli,
+        [
+            "import",
+            "--help",
+        ],
+    )
+
+    assert "Import Markdown files into a Notion database" in result.output
+    assert "--database" in result.output
+    assert "--recursive" in result.output
+    assert "--mode" in result.output
+    assert "--dry-run" in result.output
+    assert "--identifier" in result.output
+    assert result.exit_code == 0
+
+
+@patch("thought.services.markdown_import.MarkdownImportService")
+@patch("thought.cli.notion_url_to_uuid")
+def test_import_single_file(mock_uuid, mock_service_class):
+    """
+    Test importing a single file
+    """
+    runner = CliRunner()
+
+    # Mock UUID extraction
+    mock_uuid.return_value = "db-123"
+
+    # Mock import service
+    mock_service = Mock()
+    mock_service_class.return_value = mock_service
+    mock_service.import_file.return_value = Mock(
+        success=True, page_id="page-123", action="created", file_path="test.md"
+    )
+
+    with runner.isolated_filesystem():
+        # Create test file
+        with open("test.md", "w") as f:
+            f.write("# Test")
+
+        result = runner.invoke(
+            cli,
+            ["import", "test.md", "--database", "https://notion.so/db-url"],
+        )
+
+        assert result.exit_code == 0
+        assert "✅ created:" in result.output
+        mock_service.import_file.assert_called_once()
+
+
+@patch("thought.services.markdown_import.MarkdownImportService")
+@patch("thought.cli.notion_url_to_uuid")
+def test_import_directory(mock_uuid, mock_service_class):
+    """
+    Test importing a directory
+    """
+    runner = CliRunner()
+
+    # Mock UUID extraction
+    mock_uuid.return_value = "db-123"
+
+    # Mock import service
+    mock_service = Mock()
+    mock_service_class.return_value = mock_service
+    mock_service.validate_database_schema.return_value = (True, [])
+    mock_service.import_directory.return_value = Mock(
+        total_files=2,
+        successful=2,
+        failed=0,
+        results=[
+            Mock(success=True, action="created", file_path=Mock(name="file1.md")),
+            Mock(success=True, action="created", file_path=Mock(name="file2.md")),
+        ],
+    )
+
+    with runner.isolated_filesystem():
+        # Create test directory with files
+        os.mkdir("docs")
+        with open("docs/file1.md", "w") as f:
+            f.write("# File 1")
+        with open("docs/file2.md", "w") as f:
+            f.write("# File 2")
+
+        result = runner.invoke(
+            cli,
+            ["import", "docs", "--database", "https://notion.so/db-url", "--recursive"],
+        )
+
+        assert result.exit_code == 0
+        assert "Import Summary" in result.output
+        assert "Total files: 2" in result.output
+        assert "✅ Successful: 2" in result.output
+        mock_service.import_directory.assert_called_once()
+
+
+@patch("thought.services.markdown_import.MarkdownImportService")
+@patch("thought.cli.notion_url_to_uuid")
+def test_import_dry_run(mock_uuid, mock_service_class):
+    """
+    Test dry-run mode
+    """
+    runner = CliRunner()
+
+    # Mock UUID extraction
+    mock_uuid.return_value = "db-123"
+
+    # Mock import service
+    mock_service = Mock()
+    mock_service_class.return_value = mock_service
+    mock_service.import_file.return_value = Mock(
+        success=True, page_id=None, action="would create", file_path="test.md"
+    )
+
+    with runner.isolated_filesystem():
+        # Create test file
+        with open("test.md", "w") as f:
+            f.write("# Test")
+
+        result = runner.invoke(
+            cli,
+            [
+                "import",
+                "test.md",
+                "--database",
+                "https://notion.so/db-url",
+                "--dry-run",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "DRY RUN MODE" in result.output
+        assert "would create" in result.output
+
+
+@patch("thought.services.markdown_import.MarkdownImportService")
+@patch("thought.cli.notion_url_to_uuid")
+def test_import_with_errors(mock_uuid, mock_service_class):
+    """
+    Test import with errors
+    """
+    runner = CliRunner()
+
+    # Mock UUID extraction
+    mock_uuid.return_value = "db-123"
+
+    # Mock import service
+    mock_service = Mock()
+    mock_service_class.return_value = mock_service
+    mock_service.validate_database_schema.return_value = (True, [])
+    mock_service.import_directory.return_value = Mock(
+        total_files=2,
+        successful=1,
+        failed=1,
+        results=[
+            Mock(success=True, action="created", file_path=Mock(name="file1.md")),
+            Mock(success=False, error="Parse error", file_path=Mock(name="file2.md")),
+        ],
+    )
+
+    with runner.isolated_filesystem():
+        # Create test directory
+        os.mkdir("docs")
+
+        result = runner.invoke(
+            cli,
+            ["import", "docs", "--database", "https://notion.so/db-url"],
+        )
+
+        assert result.exit_code == 0
+        assert "❌ Failed: 1" in result.output
+        assert "Failed imports" in result.output
+        assert "Parse error" in result.output
+
+
 def test_old_commands_removed():
     """
     Test that old tocsv and tojson commands are no longer available

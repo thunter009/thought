@@ -1,5 +1,7 @@
 import logging
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import click
@@ -12,6 +14,7 @@ from thought.exceptions import (
     LoadDestinationNotUniqueError,
 )
 from thought.service import Registry
+from thought.services.markdown_import import MarkdownImportService
 from thought.settings import (
     LOGGING_DATE_FORMAT,
     LOGGING_FORMAT,
@@ -22,6 +25,18 @@ from thought.utils import (
     notion_url_to_uuid,
     pascal_to_lower_snake,
 )
+
+
+@dataclass
+class ImportOptions:
+    """Options for import command."""
+
+    path: str
+    database: str
+    recursive: bool = False
+    mode: str = "merge"
+    dry_run: bool = False
+    identifier: str = "auto"
 
 
 def _extract_property_value(prop_data: dict) -> Any:
@@ -391,6 +406,170 @@ def export(
         df.to_csv(f"{_output}/{uuid}.csv", index=False)
     elif file_type == "json":
         df.to_json(f"{_output}/{uuid}.json", orient="records")
+
+
+def _import_single_file(
+    service: MarkdownImportService,
+    file_path: Path,
+    database_id: str,
+    options: ImportOptions,
+) -> None:
+    """Import a single Markdown file."""
+    click.echo(f"Importing {file_path}...")
+    result = service.import_file(
+        file_path, database_id, options.mode, options.identifier, options.dry_run
+    )
+
+    if result.success:
+        click.echo(f"✅ {result.action}: {result.file_path}")
+        if result.page_id:
+            click.echo(f"   Page ID: {result.page_id}")
+    else:
+        click.echo(f"❌ Failed: {result.file_path}")
+        click.echo(f"   Error: {result.error}")
+
+
+def _import_directory(
+    service: MarkdownImportService,
+    directory_path: Path,
+    database_id: str,
+    options: ImportOptions,
+) -> None:
+    """Import all Markdown files from a directory."""
+    click.echo(f"Importing from {directory_path}...")
+    if options.recursive:
+        click.echo("   (including subdirectories)")
+
+    # Validate database schema with sample files
+    sample_files = list(directory_path.glob("*.md"))[:5]
+    if sample_files:
+        _, warnings = service.validate_database_schema(database_id, sample_files)
+        if warnings:
+            click.echo("⚠️  Schema warnings:")
+            for warning in warnings:
+                click.echo(f"   - {warning}")
+            if not click.confirm("Continue anyway?"):
+                return
+
+    # Import all files
+    result = service.import_directory(
+        directory_path,
+        database_id,
+        options.recursive,
+        options.mode,
+        options.identifier,
+        options.dry_run,
+    )
+
+    # Display summary
+    click.echo("\n📊 Import Summary:")
+    click.echo(f"   Total files: {result.total_files}")
+    click.echo(f"   ✅ Successful: {result.successful}")
+    click.echo(f"   ❌ Failed: {result.failed}")
+
+    # Show details for failed imports
+    if result.failed > 0:
+        click.echo("\n❌ Failed imports:")
+        for r in result.results:
+            if not r.success:
+                click.echo(f"   - {r.file_path}: {r.error}")
+
+    # Show created/updated pages
+    if not options.dry_run and result.successful > 0:
+        click.echo("\n✅ Imported pages:")
+        for r in result.results:
+            if r.success:
+                click.echo(f"   - {r.action}: {r.file_path.name}")
+                if r.page_id:
+                    page_id_clean = r.page_id.replace("-", "")
+                    notion_url = f"https://notion.so/{page_id_clean}"
+                    click.echo(f"     {notion_url}")
+
+
+@cli.command("import")
+@click.argument("path", type=click.Path(exists=True))
+@click.option(
+    "-d", "--database", required=True, help="URL of the Notion database to import into"
+)
+@click.option(
+    "-r",
+    "--recursive",
+    is_flag=True,
+    help="Recursively import Markdown files from subdirectories",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["merge", "replace", "skip"]),
+    default="merge",
+    help="How to handle existing pages: merge (default), replace, or skip",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview what would be imported without making changes",
+)
+@click.option(
+    "--identifier",
+    type=click.Choice(["auto", "id", "title"]),
+    default="auto",
+    help="How to identify existing pages: auto (default), id, or title",
+)
+@CONTEXT
+def import_command(  # noqa: PLR0913
+    ctx: Config,
+    path: str,
+    database: str,
+    recursive: bool,
+    mode: str,
+    dry_run: bool,
+    identifier: str,
+) -> None:
+    """Import Markdown files into a Notion database.
+
+    Arguments:
+        PATH: File or directory path containing Markdown files to import
+
+    Examples:
+        # Import a single file
+        thought import file.md --database "https://notion.so/..."
+
+        # Import all files from a directory
+        thought import ./docs/ --database "..." --recursive
+
+        # Preview import without making changes
+        thought import ./docs/ --database "..." --dry-run
+    """
+    # Create options object
+    options = ImportOptions(
+        path=path,
+        database=database,
+        recursive=recursive,
+        mode=mode,
+        dry_run=dry_run,
+        identifier=identifier,
+    )
+
+    # Initialize the import service
+    service = MarkdownImportService()
+
+    # Extract database ID from URL
+    database_id = notion_url_to_uuid(database)
+
+    # Convert path to Path object
+    import_path = Path(path)
+
+    if dry_run:
+        click.echo("🔍 DRY RUN MODE - No changes will be made")
+
+    try:
+        if import_path.is_file():
+            _import_single_file(service, import_path, database_id, options)
+        else:
+            _import_directory(service, import_path, database_id, options)
+
+    except Exception as e:
+        click.echo(f"❌ Import failed: {e!s}", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
