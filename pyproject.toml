@@ -12,7 +12,7 @@ description = "Notion CLI using Notion's API"
 authors = [{ name = "Tom Hunter", email = "tom@hunter.com" }]
 license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "click",
     "python-dotenv",

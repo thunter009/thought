@@ -28,13 +28,21 @@ def mock_notion_client():
 
 
 @pytest.fixture
-def import_service(mock_notion_client):
+def import_service():
     """Create a MarkdownImportService with mocked dependencies."""
-    with patch(
-        "thought.services.markdown_import.NotionAPIClient",
-        return_value=mock_notion_client,
-    ):
+    # Mock the NotionClient to avoid actual API calls
+    with patch("thought.client.NotionClient") as mock_notion_client:
+        # Create a mock Notion client instance
+        mock_notion_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_notion_client_instance
+
+        # Create the service
         service = MarkdownImportService()
+
+        # The service.client.client should now be the mocked NotionClient
+        # Verify and ensure it's set up correctly
+        assert service.client.client == mock_notion_client_instance
+
         return service
 
 
