@@ -16,7 +16,10 @@ NOTION_SERVICES_DIRECTORY = "Services-008f866a7d564af6ad9e49cd83Lef68788b"
 
 
 # data source providers / register external services here
-SERVICES_REGISTERED = {"instapaper": "InstapaperAPI"}
+SERVICES_REGISTERED = {
+    "instapaper": "InstapaperAPI",
+    "markdown_import": "MarkdownImportService",
+}
 SERVICES_CONFIGURATION_PATH = ["services"]
 
 # instapaper settings
