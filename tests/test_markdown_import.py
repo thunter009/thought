@@ -1,11 +1,11 @@
 """Tests for the Markdown import service."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from thought.markdown_parser import MarkdownParser, ParsedMarkdown
+from thought.markdown_parser import ParsedMarkdown
 from thought.services.markdown_import import (
     BatchImportResult,
     ImportResult,
@@ -33,37 +33,25 @@ def import_service():
     # Create mock objects
     mock_client = Mock()
     mock_client.client = MagicMock()
-    mock_parser = Mock(spec=MarkdownParser)
+    mock_parser = Mock()
     mock_converter = Mock()
 
-    # Patch the NotionAPIClient to avoid needing the token
-    with patch(
-        "thought.services.markdown_import.NotionAPIClient", return_value=mock_client
-    ):
-        with patch(
-            "thought.services.markdown_import.MarkdownParser", return_value=mock_parser
-        ):
-            with patch(
-                "thought.services.markdown_import.NotionBlockConverter",
-                return_value=mock_converter,
-            ):
-                # Create the service - this will use our mocked factories
-                service = MarkdownImportService()
+    # Configure parser to return ParsedMarkdown by default
+    mock_parser.parse_file.return_value = ParsedMarkdown(
+        frontmatter={}, content="", sections=[], file_path=Path("test.md")
+    )
 
-                # Set the mocked objects
-                service.client = mock_client
-                service.parser = mock_parser
-                service.converter = mock_converter
+    # Configure converter to return empty blocks by default
+    mock_converter.markdown_to_blocks.return_value = []
 
-                # Configure parser to return ParsedMarkdown by default
-                service.parser.parse_file.return_value = ParsedMarkdown(
-                    frontmatter={}, content="", sections=[], file_path=Path("test.md")
-                )
+    # Create the service and directly set the mocked dependencies
+    service = MarkdownImportService.__new__(MarkdownImportService)
+    service._type = "markdown_import"
+    service.client = mock_client
+    service.parser = mock_parser
+    service.converter = mock_converter
 
-                # Configure converter to return empty blocks by default
-                service.converter.markdown_to_blocks.return_value = []
-
-                return service
+    return service
 
 
 @pytest.fixture
