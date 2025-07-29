@@ -42,6 +42,14 @@ export INSTAPAPER_PASS="your_password"
   * Customize exported columns and apply filters
   * Option to convert column names to lower snake case
 
+* **Data Import**
+  * Import Markdown files with YAML frontmatter to Notion databases
+  * Support for single file or batch directory imports
+  * Smart record matching by ID or title
+  * Multiple merge strategies (merge, replace, skip)
+  * Dry-run mode for previewing changes
+  * Full Markdown syntax support with rich text formatting
+
 * **Service Integration**
   * Sync data from Instapaper to Notion collections
   * Extensible service architecture for adding new integrations
@@ -102,6 +110,71 @@ thought export "https://notion.so/your-database-url" --type csv --columns "title
 thought export "https://notion.so/your-database-url" --lower-snake-case "Created Time"
 ```
 
+### Data Import
+
+Import Markdown files into Notion databases:
+
+```bash
+# Import a single file
+thought import document.md --database "https://notion.so/your-database-url"
+
+# Import all Markdown files from a directory
+thought import ./docs/ --database "https://notion.so/your-database-url"
+
+# Import recursively from subdirectories
+thought import ./docs/ --database "https://notion.so/your-database-url" --recursive
+
+# Preview import without making changes (dry-run)
+thought import ./docs/ --database "https://notion.so/your-database-url" --dry-run
+
+# Update existing pages by title matching
+thought import file.md --database "https://notion.so/your-database-url" --identifier title
+
+# Replace content instead of merging
+thought import file.md --database "https://notion.so/your-database-url" --mode replace
+```
+
+#### Markdown Format
+
+The import feature supports Markdown files with optional YAML frontmatter:
+
+```markdown
+---
+title: My Document
+tags:
+  - documentation
+  - guide
+priority: 5
+completed: false
+due_date: 2024-12-31
+notion_id: optional-page-id-for-updates
+---
+
+# My Document
+
+Content with **bold**, *italic*, `code`, and [links](https://example.com).
+
+## Features
+
+- Bullet lists
+- Code blocks with syntax highlighting
+- Tables and quotes
+```
+
+#### Import Options
+
+* **--database**: Target Notion database URL (required)
+* **--recursive**: Include files from subdirectories
+* **--mode**: How to handle existing pages
+  * `merge` (default): Merge new content with existing
+  * `replace`: Replace all existing content
+  * `skip`: Skip updates to existing pages
+* **--identifier**: How to match existing pages
+  * `auto` (default): Try ID first, then title
+  * `id`: Match by notion_id in frontmatter
+  * `title`: Match by title
+* **--dry-run**: Preview changes without applying them
+
 ### Service Integration
 
 Sync data from external services:
@@ -124,11 +197,14 @@ src/thought/
 ├── client.py           # Notion API client wrapper
 ├── core.py             # Collection and deduplication logic
 ├── exceptions.py       # Custom exceptions
+├── markdown_parser.py  # Markdown parsing with frontmatter
+├── notion_converter.py # Markdown to Notion block conversion
 ├── service.py          # Service registry and base classes
 ├── settings.py         # Configuration and environment variables
 ├── utils.py            # Utility functions
 └── services/
-    └── instapaper.py   # Instapaper service integration
+    ├── instapaper.py   # Instapaper service integration
+    └── markdown_import.py  # Markdown import service
 ```
 
 ### Development Tools
@@ -180,6 +256,67 @@ Key dependencies include:
 * `pandas` - Data manipulation and analysis
 * `recordlinkage` - Advanced deduplication algorithms
 * `requests-oauthlib` - OAuth authentication for external services
+* `python-frontmatter` - YAML frontmatter parsing
+* `mistune` - Markdown parsing and AST generation
+
+## Troubleshooting
+
+### Import Issues
+
+#### Missing properties warning
+
+* The import tool will warn if your Markdown frontmatter contains properties not in the target database
+* These properties will be skipped during import
+* To fix: Add the missing properties to your Notion database first
+
+#### Failed to parse Markdown
+
+* Ensure your Markdown syntax is valid
+* Check for unclosed code blocks or malformed tables
+* The parser validates syntax before import
+
+#### Pages not updating
+
+* Check the identifier strategy matches your use case
+* Use `--identifier id` if using `notion_id` in frontmatter
+* Use `--identifier title` for title-based matching
+* Use `--dry-run` to preview what will be matched
+
+#### Import fails with API errors
+
+* Verify your `NOTION_ACCESS_TOKEN` is set correctly
+* Ensure the integration has access to the target database
+* Check that the database URL is correct (not a page URL)
+
+#### Content not merging correctly
+
+* Use section markers `<!-- notion-section: section-name -->` for precise merging
+* Try `--mode replace` to completely replace content
+* Use `--mode skip` to only update properties
+
+### Common Patterns
+
+#### Bulk import from documentation
+
+```bash
+# Import all docs with metadata preservation
+thought import ./docs --database "..." --recursive --dry-run
+
+# After preview, run actual import
+thought import ./docs --database "..." --recursive
+```
+
+#### Update existing tickets
+
+```bash
+# Update by ID with content replacement
+thought import ticket.md --database "..." --identifier id --mode replace
+```
+
+#### Import with specific properties only
+
+* Remove unwanted properties from frontmatter before import
+* The tool maps frontmatter 1:1 to Notion properties
 
 ## License
 
