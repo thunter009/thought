@@ -11,6 +11,8 @@ EXPECTED_LIST_ITEM_COUNT = 3
 EXPECTED_PRIORITY_VALUE = 5
 EXPECTED_TABLE_WIDTH = 2
 EXPECTED_TABLE_ROW_COUNT = 3  # Header + 2 data rows
+EXPECTED_CHECKBOX_BLOCKS = 6
+EXPECTED_BOLD_RICH_TEXT_PARTS = 3  # "Task with ", "bold", " text"
 
 
 @pytest.fixture
@@ -250,3 +252,61 @@ Final paragraph with a [link](https://example.com).
         # Check table rows
         rows = blocks[0]["table"]["children"]
         assert len(rows) == EXPECTED_TABLE_ROW_COUNT  # Header + 2 data rows
+
+    def test_checkbox_conversion(self, converter):
+        """Test checkbox/to-do item conversion."""
+        markdown = """- [x] Completed task
+- [X] Another completed task (uppercase)
+- [ ] Incomplete task
+- Regular list item
+- [x] Task with **bold** text
+- [ ] Task with `inline code`"""
+
+        blocks = converter.markdown_to_blocks(markdown)
+
+        # Verify we have the expected number of blocks
+        assert len(blocks) == EXPECTED_CHECKBOX_BLOCKS
+
+        # First block: completed checkbox
+        assert blocks[0]["type"] == "to_do"
+        assert blocks[0]["to_do"]["checked"] is True
+        assert blocks[0]["to_do"]["rich_text"][0]["text"]["content"] == "Completed task"
+
+        # Second block: completed checkbox (uppercase X)
+        assert blocks[1]["type"] == "to_do"
+        assert blocks[1]["to_do"]["checked"] is True
+        assert (
+            blocks[1]["to_do"]["rich_text"][0]["text"]["content"]
+            == "Another completed task (uppercase)"
+        )
+
+        # Third block: incomplete checkbox
+        assert blocks[2]["type"] == "to_do"
+        assert blocks[2]["to_do"]["checked"] is False
+        assert (
+            blocks[2]["to_do"]["rich_text"][0]["text"]["content"] == "Incomplete task"
+        )
+
+        # Fourth block: regular list item
+        assert blocks[3]["type"] == "bulleted_list_item"
+        assert (
+            blocks[3]["bulleted_list_item"]["rich_text"][0]["text"]["content"]
+            == "Regular list item"
+        )
+
+        # Fifth block: checkbox with bold text
+        assert blocks[4]["type"] == "to_do"
+        assert blocks[4]["to_do"]["checked"] is True
+        # Check that bold formatting is preserved
+        rich_text = blocks[4]["to_do"]["rich_text"]
+        assert len(rich_text) == EXPECTED_BOLD_RICH_TEXT_PARTS
+        assert rich_text[1]["annotations"]["bold"] is True
+        assert rich_text[1]["text"]["content"] == "bold"
+
+        # Sixth block: checkbox with inline code
+        assert blocks[5]["type"] == "to_do"
+        assert blocks[5]["to_do"]["checked"] is False
+        # Check that code formatting is preserved
+        rich_text = blocks[5]["to_do"]["rich_text"]
+        has_code = any(item["annotations"]["code"] for item in rich_text)
+        assert has_code
