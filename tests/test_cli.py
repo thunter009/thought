@@ -1,9 +1,11 @@
 import os
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from click.testing import CliRunner
 
 from thought.cli import _extract_notion_properties, _extract_property_value, cli
+from thought.services.markdown_import import BatchImportResult, ImportResult
 
 # Test constants
 TEST_NUMBER = 42
@@ -18,7 +20,7 @@ def create_mock_notion_client():
     mock_client.pages.retrieve = Mock(
         return_value={
             "id": "page-123",
-            "parent": {"database_id": "12345678-1234-1234-1234-123456789012"},
+            "parent": {"database_id": "12345678123412341234123456789012"},
         }
     )
     mock_client.pages.update = Mock()
@@ -119,13 +121,28 @@ def test_import_single_file():
         # Mock the entire Notion client and service chain
         with (
             patch("thought.cli.notion_url_to_uuid") as mock_uuid,
-            patch("thought.client.NotionClient") as mock_notion_client,
+            patch("thought.cli.MarkdownImportService") as mock_import_service_class,
+            patch(
+                "thought.services.markdown_import.NotionAPIClient"
+            ) as mock_api_client,
         ):
             # Set up UUID mock
-            mock_uuid.return_value = "12345678-1234-1234-1234-123456789012"
+            mock_uuid.return_value = "12345678123412341234123456789012"
 
-            # Set up NotionClient mock with all necessary attributes
-            mock_notion_client.return_value = create_mock_notion_client()
+            # Set up NotionAPIClient mock
+            mock_client_instance = Mock()
+            mock_client_instance.client = create_mock_notion_client()
+            mock_api_client.return_value = mock_client_instance
+
+            # Set up MarkdownImportService mock
+            mock_service = Mock()
+            mock_service.import_file.return_value = ImportResult(
+                success=True,
+                action="created",
+                file_path=Path("test.md"),
+                page_id="page-123",
+            )
+            mock_import_service_class.return_value = mock_service
 
             # Run the command
             result = runner.invoke(
@@ -157,23 +174,42 @@ def test_import_directory():
         # Mock the entire Notion client and service chain
         with (
             patch("thought.cli.notion_url_to_uuid") as mock_uuid,
-            patch("thought.client.NotionClient") as mock_notion_client,
+            patch("thought.cli.MarkdownImportService") as mock_import_service_class,
+            patch(
+                "thought.services.markdown_import.NotionAPIClient"
+            ) as mock_api_client,
         ):
             # Set up UUID mock
-            mock_uuid.return_value = "12345678-1234-1234-1234-123456789012"
+            mock_uuid.return_value = "12345678123412341234123456789012"
 
-            # Set up NotionClient mock
-            mock_client = create_mock_notion_client()
-            # Override pages.create to return different IDs for each file
-            call_count = 0
+            # Set up NotionAPIClient mock
+            mock_client_instance = Mock()
+            mock_client_instance.client = create_mock_notion_client()
+            mock_api_client.return_value = mock_client_instance
 
-            def create_page(*args, **kwargs):
-                nonlocal call_count
-                call_count += 1
-                return {"id": f"page-{call_count}", "properties": {}}
-
-            mock_client.pages.create = Mock(side_effect=create_page)
-            mock_notion_client.return_value = mock_client
+            # Set up MarkdownImportService mock
+            mock_service = Mock()
+            mock_service.import_directory.return_value = BatchImportResult(
+                total_files=2,
+                successful=2,
+                failed=0,
+                results=[
+                    ImportResult(
+                        success=True,
+                        action="created",
+                        file_path=Path("docs/file1.md"),
+                        page_id="page-1",
+                    ),
+                    ImportResult(
+                        success=True,
+                        action="created",
+                        file_path=Path("docs/file2.md"),
+                        page_id="page-2",
+                    ),
+                ],
+            )
+            mock_service.validate_database_schema.return_value = (True, [])
+            mock_import_service_class.return_value = mock_service
 
             # Run the command
             result = runner.invoke(
@@ -215,13 +251,28 @@ def test_import_dry_run():
         # Mock the entire Notion client and service chain
         with (
             patch("thought.cli.notion_url_to_uuid") as mock_uuid,
-            patch("thought.client.NotionClient") as mock_notion_client,
+            patch("thought.cli.MarkdownImportService") as mock_import_service_class,
+            patch(
+                "thought.services.markdown_import.NotionAPIClient"
+            ) as mock_api_client,
         ):
             # Set up UUID mock
-            mock_uuid.return_value = "12345678-1234-1234-1234-123456789012"
+            mock_uuid.return_value = "12345678123412341234123456789012"
 
-            # Set up NotionClient mock
-            mock_notion_client.return_value = create_mock_notion_client()
+            # Set up NotionAPIClient mock
+            mock_client_instance = Mock()
+            mock_client_instance.client = create_mock_notion_client()
+            mock_api_client.return_value = mock_client_instance
+
+            # Set up MarkdownImportService mock
+            mock_service = Mock()
+            mock_service.import_file.return_value = ImportResult(
+                success=True,
+                action="would create",
+                file_path=Path("test.md"),
+                page_id=None,
+            )
+            mock_import_service_class.return_value = mock_service
 
             # Run the command with dry-run
             result = runner.invoke(
@@ -260,14 +311,43 @@ def test_import_with_errors():
         # Mock the entire Notion client and service chain
         with (
             patch("thought.cli.notion_url_to_uuid") as mock_uuid,
-            patch("thought.client.NotionClient") as mock_notion_client,
+            patch("thought.cli.MarkdownImportService") as mock_import_service_class,
+            patch(
+                "thought.services.markdown_import.NotionAPIClient"
+            ) as mock_api_client,
         ):
             # Set up UUID mock
-            mock_uuid.return_value = "12345678-1234-1234-1234-123456789012"
+            mock_uuid.return_value = "12345678123412341234123456789012"
 
-            # Set up NotionClient mock
-            mock_client = create_mock_notion_client()
-            mock_notion_client.return_value = mock_client
+            # Set up NotionAPIClient mock
+            mock_client_instance = Mock()
+            mock_client_instance.client = create_mock_notion_client()
+            mock_api_client.return_value = mock_client_instance
+
+            # Set up MarkdownImportService mock
+            mock_service = Mock()
+            mock_service.import_directory.return_value = BatchImportResult(
+                total_files=2,
+                successful=1,
+                failed=1,
+                results=[
+                    ImportResult(
+                        success=True,
+                        action="created",
+                        file_path=Path("docs/valid.md"),
+                        page_id="page-1",
+                    ),
+                    ImportResult(
+                        success=False,
+                        action="created",
+                        file_path=Path("docs/invalid.md"),
+                        page_id=None,
+                        error="Parse error: invalid YAML",
+                    ),
+                ],
+            )
+            mock_service.validate_database_schema.return_value = (True, [])
+            mock_import_service_class.return_value = mock_service
 
             # Run the command
             result = runner.invoke(

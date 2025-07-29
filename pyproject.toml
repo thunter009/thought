@@ -42,6 +42,10 @@ target-version = "py311"
 select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+# Ignore E501 line length in test files for long patch statements
+"tests/*.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

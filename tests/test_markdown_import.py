@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from thought.markdown_parser import ParsedMarkdown
+from thought.markdown_parser import MarkdownParser, ParsedMarkdown
 from thought.services.markdown_import import (
     BatchImportResult,
     ImportResult,
@@ -30,20 +30,40 @@ def mock_notion_client():
 @pytest.fixture
 def import_service():
     """Create a MarkdownImportService with mocked dependencies."""
-    # Mock the NotionClient to avoid actual API calls
-    with patch("thought.client.NotionClient") as mock_notion_client:
-        # Create a mock Notion client instance
-        mock_notion_client_instance = MagicMock()
-        mock_notion_client.return_value = mock_notion_client_instance
+    # Create mock objects
+    mock_client = Mock()
+    mock_client.client = MagicMock()
+    mock_parser = Mock(spec=MarkdownParser)
+    mock_converter = Mock()
 
-        # Create the service
-        service = MarkdownImportService()
+    # Patch the NotionAPIClient to avoid needing the token
+    with patch(
+        "thought.services.markdown_import.NotionAPIClient", return_value=mock_client
+    ):
+        with patch(
+            "thought.services.markdown_import.MarkdownParser", return_value=mock_parser
+        ):
+            with patch(
+                "thought.services.markdown_import.NotionBlockConverter",
+                return_value=mock_converter,
+            ):
+                # Create the service - this will use our mocked factories
+                service = MarkdownImportService()
 
-        # The service.client.client should now be the mocked NotionClient
-        # Verify and ensure it's set up correctly
-        assert service.client.client == mock_notion_client_instance
+                # Set the mocked objects
+                service.client = mock_client
+                service.parser = mock_parser
+                service.converter = mock_converter
 
-        return service
+                # Configure parser to return ParsedMarkdown by default
+                service.parser.parse_file.return_value = ParsedMarkdown(
+                    frontmatter={}, content="", sections=[], file_path=Path("test.md")
+                )
+
+                # Configure converter to return empty blocks by default
+                service.converter.markdown_to_blocks.return_value = []
+
+                return service
 
 
 @pytest.fixture
@@ -78,6 +98,26 @@ tags:
 
 Content here.
 """)
+
+        # Configure parser to return parsed content
+        import_service.parser.parse_file.return_value = ParsedMarkdown(
+            frontmatter={"title": "New Document", "tags": ["test"]},
+            content="# New Document\n\nContent here.",
+            sections=[],
+            file_path=test_file,
+        )
+
+        # Configure converter
+        import_service.converter.markdown_to_blocks.return_value = [
+            {
+                "type": "heading_1",
+                "heading_1": {"rich_text": [{"text": {"content": "New Document"}}]},
+            },
+            {
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"text": {"content": "Content here."}}]},
+            },
+        ]
 
         # Mock API responses
         import_service.client.client.databases.query = MagicMock(
@@ -124,6 +164,25 @@ notion_id: existing-page-123
 
 # Updated Content
 """)
+
+        # Configure parser
+        import_service.parser.parse_file.return_value = ParsedMarkdown(
+            frontmatter={
+                "title": "Existing Document",
+                "notion_id": "existing-page-123",
+            },
+            content="# Updated Content",
+            sections=[],
+            file_path=test_file,
+        )
+
+        # Configure converter
+        import_service.converter.markdown_to_blocks.return_value = [
+            {
+                "type": "heading_1",
+                "heading_1": {"rich_text": [{"text": {"content": "Updated Content"}}]},
+            }
+        ]
 
         # Mock finding existing page
         import_service.client.client.pages.retrieve = MagicMock(
@@ -326,12 +385,27 @@ notion_id: existing-page-123
     def test_validate_database_schema(self, import_service, tmp_path):
         """Test database schema validation."""
         # Create sample files
-        (tmp_path / "test1.md").write_text("""---
+        test_file = tmp_path / "test1.md"
+        test_file.write_text("""---
 title: Test
 custom_field: Value
 ---
 # Test
 """)
+
+        # Configure parser to return parsed content
+        import_service.parser.parse_file.return_value = ParsedMarkdown(
+            frontmatter={"title": "Test", "custom_field": "Value"},
+            content="# Test",
+            sections=[],
+            file_path=test_file,
+        )
+
+        # Configure converter to return properties
+        import_service.converter.frontmatter_to_properties.return_value = {
+            "Title": {"rich_text": [{"text": {"content": "Test"}}]},
+            "Custom Field": {"rich_text": [{"text": {"content": "Value"}}]},
+        }
 
         # Mock database schema
         import_service.client.client.databases.retrieve = MagicMock(
@@ -353,6 +427,14 @@ custom_field: Value
 
     def test_mode_replace(self, import_service, sample_parsed_markdown):
         """Test replace mode for updates."""
+        # Configure converter to return blocks
+        import_service.converter.markdown_to_blocks.return_value = [
+            {
+                "type": "heading_1",
+                "heading_1": {"rich_text": [{"text": {"content": "Test Document"}}]},
+            }
+        ]
+
         import_service.client.client.pages.retrieve = MagicMock(
             return_value={"parent": {"database_id": "db-123"}}
         )
@@ -388,6 +470,14 @@ custom_field: Value
 
     def test_mode_skip(self, import_service, sample_parsed_markdown):
         """Test skip mode for updates."""
+        # Configure converter to return blocks
+        import_service.converter.markdown_to_blocks.return_value = [
+            {
+                "type": "heading_1",
+                "heading_1": {"rich_text": [{"text": {"content": "Test Document"}}]},
+            }
+        ]
+
         import_service.client.client.pages.retrieve = MagicMock(
             return_value={"parent": {"database_id": "db-123"}}
         )
@@ -411,6 +501,14 @@ custom_field: Value
 
     def test_mode_merge(self, import_service, sample_parsed_markdown):
         """Test merge mode for updates (currently same as replace)."""
+        # Configure converter to return blocks
+        import_service.converter.markdown_to_blocks.return_value = [
+            {
+                "type": "heading_1",
+                "heading_1": {"rich_text": [{"text": {"content": "Test Document"}}]},
+            }
+        ]
+
         import_service.client.client.pages.retrieve = MagicMock(
             return_value={"parent": {"database_id": "db-123"}}
         )
