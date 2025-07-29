@@ -1,5 +1,6 @@
 """Convert Markdown elements to Notion blocks."""
 
+import copy
 import re
 from typing import Any
 
@@ -105,13 +106,43 @@ class NotionBlockConverter:
         self, node: dict[str, Any], list_type: str = "bulleted_list_item"
     ) -> dict[str, Any]:
         """Convert list item to Notion list item block."""
-        rich_text = self._convert_inline_elements(node.get("children", []))
+        # Only check for checkbox in bulleted lists
+        if list_type != "bulleted_list_item":
+            rich_text = self._convert_inline_elements(node.get("children", []))
+            return {
+                "object": "block",
+                "type": list_type,
+                list_type: {"rich_text": rich_text},
+            }
 
-        return {
-            "object": "block",
-            "type": list_type,
-            list_type: {"rich_text": rich_text},
-        }
+        # Extract the full text content to check for checkbox pattern
+        full_text = self._extract_text(node.get("children", []))
+        checkbox_match = re.match(r"^\[([ x])\]\s*(.*)$", full_text, re.IGNORECASE)
+
+        if checkbox_match:
+            # This is a checkbox/to-do item
+            checked = checkbox_match.group(1).lower() == "x"
+
+            # Process the rich text, removing the checkbox syntax
+            modified_children = self._remove_checkbox_syntax(node.get("children", []))
+            rich_text = self._convert_inline_elements(modified_children)
+
+            return {
+                "object": "block",
+                "type": "to_do",
+                "to_do": {
+                    "rich_text": rich_text,
+                    "checked": checked,
+                },
+            }
+        else:
+            # Regular list item
+            rich_text = self._convert_inline_elements(node.get("children", []))
+            return {
+                "object": "block",
+                "type": list_type,
+                list_type: {"rich_text": rich_text},
+            }
 
     def _convert_code_block(self, node: dict[str, Any]) -> dict[str, Any]:
         """Convert code block to Notion code block."""
@@ -278,6 +309,57 @@ class NotionBlockConverter:
             elif "children" in child:
                 text += self._extract_text(child["children"])
         return text
+
+    def _remove_checkbox_syntax(
+        self, children: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Remove checkbox syntax from the beginning of children nodes."""
+        modified_children = copy.deepcopy(children)
+
+        # Track if we've removed the checkbox syntax
+        checkbox_removed = False
+
+        for child in modified_children:
+            if checkbox_removed:
+                break
+
+            if child.get("type") in ["block_text", "paragraph"]:
+                inner_children = child.get("children", [])
+
+                # Process text nodes to remove checkbox syntax
+                text_accumulated = ""
+                nodes_to_process = []
+
+                for i, inner_child in enumerate(inner_children):
+                    if inner_child.get("type") == "text":
+                        text = inner_child.get("raw", inner_child.get("text", ""))
+                        text_accumulated += text
+                        nodes_to_process.append(i)
+
+                        # Check if we have enough text to match checkbox pattern
+                        checkbox_match = re.match(
+                            r"^\[([ x])\]\s*(.*)$", text_accumulated, re.IGNORECASE
+                        )
+                        if checkbox_match:
+                            # Found the checkbox pattern
+                            remainder = checkbox_match.group(2)
+
+                            # Remove all accumulated text nodes
+                            for idx in reversed(nodes_to_process[:-1]):
+                                inner_children.pop(idx)
+
+                            # Update the last text node with the remainder
+                            last_idx = nodes_to_process[-1] - len(nodes_to_process[:-1])
+                            inner_children[last_idx]["raw"] = remainder
+                            inner_children[last_idx]["text"] = remainder
+
+                            checkbox_removed = True
+                            break
+                    else:
+                        # Non-text node, stop accumulating
+                        break
+
+        return modified_children
 
     def _extract_text_from_children(self, children: list[dict[str, Any]]) -> str:
         """Extract text from complex children structures."""
