@@ -7,9 +7,9 @@ packages = ["src/thought"]
 
 [project]
 name = "thought"
-version = "0.2.0"
+version = "0.3.0"
 description = "Notion CLI using Notion's API"
-authors = [{ name = "Tom Hunter", email = "tom@hunter.com" }]
+authors = [{ name = "Tom Hunter", email = "tom@hunter.xyz" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.13"
@@ -28,11 +28,20 @@ dependencies = [
     "mistune",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest", "pytest-cov", "ruff", "pre-commit", "sphinx", "ipykernel"]
-
 [project.scripts]
 thought = "thought.cli:cli"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "pre-commit",
+    "sphinx",
+    "ipykernel",
+    "commitizen",
+    "pre-commit",
+]
 
 [tool.ruff]
 line-length = 88
@@ -57,5 +66,13 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=thought"
 filterwarnings = [
-    "ignore:invalid escape sequence:SyntaxWarning:notion.markdown"
+    "ignore:invalid escape sequence:SyntaxWarning:notion.markdown",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.3.0"
+tag_format = "v$version"
+version_files = ["pyproject.toml:version"]
+update_changelog_on_bump = true
+major_version_zero = true

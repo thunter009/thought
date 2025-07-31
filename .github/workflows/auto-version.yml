@@ -1,0 +1,131 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install commitizen
+      run: |
+        pip install commitizen
+
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Check for version bump
+      id: check_bump
+      run: |
+        # Check if there are any conventional commits since last tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $LATEST_TAG"
+
+        # Get commits since last tag
+        COMMITS=$(git log ${LATEST_TAG}..HEAD --pretty=format:"%s")
+        echo "Commits since $LATEST_TAG:"
+        echo "$COMMITS"
+
+        # Check if any commits require version bump
+        NEEDS_BUMP=false
+        if echo "$COMMITS" | grep -qE "^(feat|fix|BREAKING CHANGE)"; then
+          NEEDS_BUMP=true
+        fi
+
+        echo "needs_bump=$NEEDS_BUMP" >> $GITHUB_OUTPUT
+
+    - name: Bump version
+      if: steps.check_bump.outputs.needs_bump == 'true'
+      id: bump
+      run: |
+        # Perform the bump
+        cz bump --yes --no-verify
+
+        # Get the new version
+        NEW_VERSION=$(grep -E '^version = "[0-9]+\.[0-9]+\.[0-9]+"' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "new_version=v$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: v$NEW_VERSION"
+
+    - name: Push changes
+      if: steps.check_bump.outputs.needs_bump == 'true'
+      run: |
+        git push origin main --follow-tags
+
+    - name: Generate changelog
+      if: steps.check_bump.outputs.needs_bump == 'true'
+      id: changelog
+      run: |
+        # Get the previous and current tags
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "v0.0.0")
+        CURRENT_TAG="${{ steps.bump.outputs.new_version }}"
+
+        # Generate changelog using commitizen
+        cz changelog --dry-run --incremental --start-rev $PREVIOUS_TAG > RELEASE_NOTES.md || echo "## Changes" > RELEASE_NOTES.md
+
+        # If commitizen changelog fails, generate basic changelog
+        if [ ! -s RELEASE_NOTES.md ]; then
+          echo "## What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+
+          git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%s (%h)" | while read line; do
+            if [[ $line =~ ^feat ]]; then
+              echo "- ✨ $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^fix ]]; then
+              echo "- 🐛 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^docs ]]; then
+              echo "- 📚 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^style ]]; then
+              echo "- 💎 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^refactor ]]; then
+              echo "- ♻️ $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^perf ]]; then
+              echo "- 🚀 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^test ]]; then
+              echo "- 🧪 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^build ]]; then
+              echo "- 🏗️ $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^ci ]]; then
+              echo "- 👷 $line" >> RELEASE_NOTES.md
+            elif [[ $line =~ ^chore ]]; then
+              echo "- 🔧 $line" >> RELEASE_NOTES.md
+            else
+              echo "- $line" >> RELEASE_NOTES.md
+            fi
+          done
+        fi
+
+        echo "" >> RELEASE_NOTES.md
+        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}" >> RELEASE_NOTES.md
+
+    - name: Create GitHub Release
+      if: steps.check_bump.outputs.needs_bump == 'true'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.bump.outputs.new_version }}
+        release_name: Release ${{ steps.bump.outputs.new_version }}
+        body_path: RELEASE_NOTES.md
+        draft: false
+        prerelease: false
