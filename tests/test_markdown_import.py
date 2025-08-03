@@ -389,11 +389,16 @@ custom_field: Value
             file_path=test_file,
         )
 
-        # Configure converter to return properties
+        # Configure converter to return properties (still needed for backward compatibility)
         import_service.converter.frontmatter_to_properties.return_value = {
             "Title": {"rich_text": [{"text": {"content": "Test"}}]},
             "Custom Field": {"rich_text": [{"text": {"content": "Value"}}]},
         }
+
+        # Mock the _convert_properties_with_schema method used in validation
+        import_service._convert_properties_with_schema = MagicMock(
+            return_value={"Title": {"title": [{"text": {"content": "Test"}}]}}
+        )
 
         # Mock database schema
         import_service.client.client.databases.retrieve = MagicMock(
@@ -411,7 +416,7 @@ custom_field: Value
 
         assert valid
         assert len(warnings) > 0
-        assert "Custom Field" in warnings[0]
+        assert "custom_field" in warnings[0]
 
     def test_mode_replace(self, import_service, sample_parsed_markdown):
         """Test replace mode for updates."""

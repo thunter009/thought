@@ -490,25 +490,48 @@ class MarkdownImportService(GenericService):
         except Exception as e:
             return False, [f"Failed to retrieve database: {e!s}"]
 
-        # Parse sample files to get property names
+        # Parse sample files to get property names that would actually be used
         all_properties = set()
         for file_path in sample_files[:5]:  # Check up to 5 files
             try:
                 parsed = self.parser.parse_file(file_path)
-                properties = self.converter.frontmatter_to_properties(
-                    parsed.frontmatter
+                # Use the same logic as the actual import process
+                properties = self._convert_properties_with_schema(
+                    parsed.frontmatter, db_properties
                 )
                 all_properties.update(properties.keys())
             except Exception:
                 continue
 
-        # Check for missing properties
-        db_prop_names = {name for name in db_properties.keys()}
-        missing_props = all_properties - db_prop_names
+        # Find properties that are in frontmatter but not mappable to database
+        all_frontmatter_keys = set()
+        for file_path in sample_files[:5]:  # Check up to 5 files
+            try:
+                parsed = self.parser.parse_file(file_path)
+                all_frontmatter_keys.update(parsed.frontmatter.keys())
+            except Exception:
+                continue
 
-        if missing_props:
+        # Check for frontmatter properties that won't be imported
+        db_prop_names_lower = {name.lower() for name in db_properties.keys()}
+        unmappable_props = []
+
+        for key in all_frontmatter_keys:
+            # Skip special keys and title (title is always handled automatically)
+            if key in {"notion_id", "notion_page_id", "title"}:
+                continue
+
+            # Check if this property can be mapped to a database property
+            property_name = key.replace("_", " ").title()
+            if (
+                property_name not in db_properties
+                and property_name.lower() not in db_prop_names_lower
+            ):
+                unmappable_props.append(key)
+
+        if unmappable_props:
             warnings.append(
-                f"Database missing properties: {', '.join(missing_props)}. "
+                f"Database missing properties: {', '.join(unmappable_props)}. "
                 "These will be skipped during import."
             )
 
