@@ -34,3 +34,50 @@ class NotionAPIClient:
         if token is None:
             raise ValueError("Notion access token is required")
         return NotionClient(auth=token)
+
+    def search_users(self, search_term: str | None = None) -> list[dict[str, Any]]:
+        """
+        Search for users in the workspace
+        """
+        assert self.client is not None
+        users = self.client.users.list()
+        all_users = users.get("results", [])
+
+        if search_term is None:
+            return all_users
+
+        search_lower = search_term.lower()
+        filtered_users = []
+
+        for user in all_users:
+            name = user.get("name", "").lower()
+            email = (
+                user.get("person", {}).get("email", "").lower()
+                if user.get("person")
+                else ""
+            )
+
+            if search_lower in name or search_lower in email:
+                filtered_users.append(user)
+
+        return filtered_users
+
+    def get_user_by_name_or_email(self, identifier: str) -> dict[str, Any] | None:
+        """
+        Get a user by name or email
+        """
+        users = self.search_users(identifier)
+
+        for user in users:
+            name = user.get("name", "").lower()
+            email = (
+                user.get("person", {}).get("email", "").lower()
+                if user.get("person")
+                else ""
+            )
+            identifier_lower = identifier.lower()
+
+            if identifier_lower in (name, email):
+                return user
+
+        return None
