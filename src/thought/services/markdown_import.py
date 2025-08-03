@@ -207,7 +207,7 @@ class MarkdownImportService(GenericService):
         properties = {}
         db_prop_names_lower = {name.lower(): name for name in db_properties.keys()}
 
-        for key, value in frontmatter.items():
+        for key, original_value in frontmatter.items():
             # Skip special keys
             if key in {"notion_id", "notion_page_id"}:
                 continue
@@ -228,6 +228,16 @@ class MarkdownImportService(GenericService):
             # Get property type from database schema
             prop_config = db_properties[actual_prop_name]
             prop_type = prop_config.get("type", "")
+
+            # Set the working value
+            value = original_value
+
+            # Special handling for assignee fields
+            if key.lower() in ["assignee", "assigned_to"] and prop_type == "people":
+                resolved_value = self._resolve_assignee_to_user_id(original_value)
+                if not resolved_value:
+                    continue  # Skip if user not found
+                value = resolved_value
 
             # Convert value based on property type
             if prop_type == "select":
@@ -259,9 +269,51 @@ class MarkdownImportService(GenericService):
                 properties[actual_prop_name] = {
                     prop_type: [{"text": {"content": str(value)}}]
                 }
+            elif prop_type == "people":
+                # Handle people/user assignments - value should be user ID(s)
+                if isinstance(value, list):
+                    # Multiple assignees
+                    properties[actual_prop_name] = {
+                        "people": [
+                            {"object": "user", "id": str(user_id)}
+                            for user_id in value
+                            if user_id
+                        ]
+                    }
+                # Single assignee
+                elif value:
+                    properties[actual_prop_name] = {
+                        "people": [{"object": "user", "id": str(value)}]
+                    }
             # Add more property types as needed
 
         return properties
+
+    def _resolve_assignee_to_user_id(
+        self, assignee_value: Any
+    ) -> str | list[str] | None:
+        """Resolve assignee name/email to Notion user ID(s)."""
+        if not assignee_value:
+            return None
+
+        if isinstance(assignee_value, list):
+            # Multiple assignees
+            user_ids = []
+            for assignee in assignee_value:
+                user = self.client.get_user_by_name_or_email(str(assignee))
+                if user:
+                    user_ids.append(user["id"])
+                else:
+                    print(f"Warning: User '{assignee}' not found in workspace")
+            return user_ids if user_ids else None
+        else:
+            # Single assignee
+            user = self.client.get_user_by_name_or_email(str(assignee_value))
+            if user:
+                return user["id"]
+            else:
+                print(f"Warning: User '{assignee_value}' not found in workspace")
+                return None
 
     def _create_page(self, database_id: str, parsed: ParsedMarkdown) -> str:
         """Create a new page in Notion."""

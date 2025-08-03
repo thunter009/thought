@@ -12,6 +12,8 @@ class TestNotionAPIClient:
     Note: these are not integration tests using this API client
     """
 
+    EXPECTED_USER_COUNT = 2
+
     @staticmethod
     @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
     @patch("thought.client.NotionClient")
@@ -173,3 +175,96 @@ class TestNotionAPIClient:
 
         with pytest.raises(AssertionError):
             client.query(test_query)
+
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
+    @patch("thought.client.NotionClient")
+    def test_search_users(mock_notion_client):
+        """
+        Test searching for users in the workspace
+        """
+        # Setup mock
+        mock_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_client_instance
+        mock_client_instance.users.list.return_value = {
+            "results": [
+                {
+                    "id": "user1",
+                    "name": "John Doe",
+                    "type": "person",
+                    "person": {"email": "john@example.com"},
+                },
+                {
+                    "id": "user2",
+                    "name": "Jane Smith",
+                    "type": "person",
+                    "person": {"email": "jane@example.com"},
+                },
+            ]
+        }
+
+        # Create client and test search
+        client = NotionAPIClient()
+
+        # Test search with no filter
+        all_users = client.search_users()
+        assert len(all_users) == TestNotionAPIClient.EXPECTED_USER_COUNT
+
+        # Test search with name filter
+        john_users = client.search_users("john")
+        assert len(john_users) == 1
+        assert john_users[0]["name"] == "John Doe"
+
+        # Test search with email filter
+        jane_users = client.search_users("jane@example.com")
+        assert len(jane_users) == 1
+        assert jane_users[0]["name"] == "Jane Smith"
+
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
+    @patch("thought.client.NotionClient")
+    def test_get_user_by_name_or_email(mock_notion_client):
+        """
+        Test getting a specific user by name or email
+        """
+        # Setup mock
+        mock_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_client_instance
+        mock_client_instance.users.list.return_value = {
+            "results": [
+                {
+                    "id": "user1",
+                    "name": "John Doe",
+                    "type": "person",
+                    "person": {"email": "john@example.com"},
+                },
+                {
+                    "id": "user2",
+                    "name": "Jane Smith",
+                    "type": "person",
+                    "person": {"email": "jane@example.com"},
+                },
+            ]
+        }
+
+        # Create client and test user lookup
+        client = NotionAPIClient()
+
+        # Test lookup by exact name
+        user = client.get_user_by_name_or_email("John Doe")
+        assert user is not None
+        assert user["id"] == "user1"
+
+        # Test lookup by exact email
+        user = client.get_user_by_name_or_email("jane@example.com")
+        assert user is not None
+        assert user["id"] == "user2"
+
+        # Test lookup with case-insensitive match
+        user = client.get_user_by_name_or_email("JOHN DOE")
+        assert user is not None
+        assert user["id"] == "user1"
+
+        # Test lookup with non-existent user
+        user = client.get_user_by_name_or_email("Unknown User")
+        assert user is None

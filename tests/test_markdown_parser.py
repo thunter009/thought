@@ -193,6 +193,35 @@ title: No ID
         result3 = parser.parse_content(content3)
         assert result3.notion_id is None
 
+    def test_assignee_property(self, parser):
+        """Test assignee extraction."""
+        # assignee field
+        content1 = """---
+assignee: john@example.com
+---
+# Title
+"""
+        result1 = parser.parse_content(content1)
+        assert result1.assignee == "john@example.com"
+
+        # assigned_to field
+        content2 = """---
+assigned_to: Jane Doe
+---
+# Title
+"""
+        result2 = parser.parse_content(content2)
+        assert result2.assignee == "Jane Doe"
+
+        # No assignee
+        content3 = """---
+title: No Assignee
+---
+# Title
+"""
+        result3 = parser.parse_content(content3)
+        assert result3.assignee is None
+
     def test_validate_markdown(self, parser):
         """Test Markdown validation."""
         # Valid Markdown

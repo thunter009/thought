@@ -57,6 +57,11 @@ class ParsedMarkdown:
             "notion_page_id"
         )
 
+    @property
+    def assignee(self) -> str | None:
+        """Extract assignee from frontmatter."""
+        return self.frontmatter.get("assignee") or self.frontmatter.get("assigned_to")
+
 
 class MarkdownParser:
     """Parser for Markdown files with frontmatter support."""
