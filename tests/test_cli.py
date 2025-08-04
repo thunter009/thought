@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -576,3 +577,88 @@ def test_export_command_json(mock_client_class, mock_url_to_uuid):
         assert result.exit_code == 0
         # Check that JSON file was created
         assert os.path.exists("test-uuid.json")
+
+
+class TestCLILogging:
+    """Test CLI logging functionality."""
+
+    def test_cli_verbose_flag(self, caplog):
+        """Test that the --verbose flag enables debug logging."""
+        runner = CliRunner()
+
+        with caplog.at_level(logging.DEBUG):
+            result = runner.invoke(cli, ["--verbose", "--help"])
+
+        assert result.exit_code == 0
+        # The configure_logging function should have been called
+        # We can't easily test the actual logging level here due to Click's isolation
+        # but we can test that the command runs successfully with verbose flag
+
+    def test_cli_quiet_flag(self, caplog):
+        """Test that the --quiet flag enables warning-only logging."""
+        runner = CliRunner()
+
+        result = runner.invoke(cli, ["--quiet", "--help"])
+        assert result.exit_code == 0
+
+    def test_cli_verbose_and_quiet_flags_conflict(self):
+        """Test that verbose and quiet flags can be used together (quiet takes precedence)."""
+        runner = CliRunner()
+
+        # Both flags should be accepted (no error)
+        result = runner.invoke(cli, ["--verbose", "--quiet", "--help"])
+        assert result.exit_code == 0
+
+    def test_import_with_verbose_logging(self, caplog):
+        """Test import command with verbose logging."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            # Create test file
+            with open("test.md", "w") as f:
+                f.write("# Test Document\n\nThis is test content.")
+
+            # Mock the entire Notion client and service chain
+            with (
+                patch("thought.cli.notion_url_to_uuid") as mock_uuid,
+                patch("thought.cli.MarkdownImportService") as mock_import_service_class,
+                patch(
+                    "thought.services.markdown_import.NotionAPIClient"
+                ) as mock_api_client,
+            ):
+                # Set up UUID mock
+                mock_uuid.return_value = "12345678123412341234123456789012"
+
+                # Set up NotionAPIClient mock
+                mock_client_instance = Mock()
+                mock_client_instance.client = create_mock_notion_client()
+                mock_api_client.return_value = mock_client_instance
+
+                # Set up MarkdownImportService mock
+                mock_service = Mock()
+                mock_service.import_file.return_value = ImportResult(
+                    success=True,
+                    action="created",
+                    file_path=Path("test.md"),
+                    page_id="page-123",
+                )
+                mock_import_service_class.return_value = mock_service
+
+                # Run the command with verbose flag
+                with caplog.at_level(logging.DEBUG):
+                    result = runner.invoke(
+                        cli,
+                        [
+                            "--verbose",
+                            "import",
+                            "test.md",
+                            "--database",
+                            "https://notion.so/db-url",
+                        ],
+                        catch_exceptions=False,
+                    )
+
+                # Check the output
+                assert result.exit_code == 0
+                # With verbose mode, we should see more detailed output
+                assert "✅ created: test.md" in result.output

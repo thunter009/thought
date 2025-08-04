@@ -111,12 +111,12 @@ class NotionBlockConverter:
     def _split_paragraph_lines(
         self, children: list[dict[str, Any]]
     ) -> list[list[dict[str, Any]]]:
-        """Split paragraph children by softbreak into separate lines."""
+        """Split paragraph children by linebreak (not softbreak) into separate lines."""
         current_line_parts = []
         lines = []
 
         for child in children:
-            if child.get("type") == "softbreak":
+            if child.get("type") == "linebreak":
                 if current_line_parts:
                     lines.append(current_line_parts)
                     current_line_parts = []
@@ -195,6 +195,10 @@ class NotionBlockConverter:
         for part in line_parts:
             if part.get("type") == "text":
                 line_text += part.get("raw", part.get("text", ""))
+            elif part.get("type") == "softbreak":
+                line_text += " "
+            elif part.get("type") == "linebreak":
+                line_text += "\n"
             elif part.get("type") in ["strong", "emphasis", "code_span", "codespan"]:
                 line_text += self._extract_text(part.get("children", []))
         return line_text
@@ -444,6 +448,14 @@ class NotionBlockConverter:
                 text = child.get("raw", child.get("text", ""))
                 rich_text.append(NotionBlockConverter._create_text_object(text))
 
+            elif child_type == "softbreak":
+                # Convert softbreak (line wrapping) to a single space
+                rich_text.append(NotionBlockConverter._create_text_object(" "))
+
+            elif child_type == "linebreak":
+                # Convert linebreak (intentional break with two spaces) to line break
+                rich_text.append(NotionBlockConverter._create_text_object("\n"))
+
             elif child_type == "strong":
                 text = self._extract_text(child.get("children", []))
                 rich_text.append(
@@ -492,6 +504,12 @@ class NotionBlockConverter:
             if child.get("type") == "text":
                 # Handle both 'raw' and 'text' fields
                 text += child.get("raw", child.get("text", ""))
+            elif child.get("type") == "softbreak":
+                # Convert softbreak to space for text extraction
+                text += " "
+            elif child.get("type") == "linebreak":
+                # Convert linebreak to newline for text extraction
+                text += "\n"
             elif child.get("type") in ["codespan", "code_span"]:
                 text += child.get("raw", child.get("text", ""))
             elif "children" in child:

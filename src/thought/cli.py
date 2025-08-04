@@ -13,6 +13,7 @@ from thought.exceptions import (
     CollectionMustAlreadyExistError,
     LoadDestinationNotUniqueError,
 )
+from thought.logging_utils import configure_logging, get_logger
 from thought.service import Registry
 from thought.services.markdown_import import MarkdownImportService
 from thought.settings import (
@@ -107,6 +108,8 @@ class Config:
     service_config_directory: str
     registry: Any
     _client: Any = None
+    verbose: bool = False
+    quiet: bool = False
 
     @property
     def client(self) -> Any:
@@ -131,13 +134,31 @@ CONTEXT = click.make_pass_decorator(Config, ensure=True)
     help="Directory where {service}.toml configuration file is loaded from. "
     "Defaults to '/services/'",
 )
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Enable verbose logging (DEBUG level)",
+)
+@click.option(
+    "-q",
+    "--quiet",
+    is_flag=True,
+    help="Enable quiet mode (WARNING level only)",
+)
 @CONTEXT
-def cli(ctx: Config, service_config_directory: str) -> None:
+def cli(ctx: Config, service_config_directory: str, verbose: bool, quiet: bool) -> None:
     """
     Thought - Notion CLI
     """
     ctx.service_config_directory = service_config_directory
     ctx.registry = Registry()
+    ctx.verbose = verbose
+    ctx.quiet = quiet
+
+    # Configure logging based on verbosity flags
+    configure_logging(verbose=verbose, quiet=quiet)
+
     # Initialize client lazily - only when actually needed
     ctx._client = None
 
@@ -413,20 +434,40 @@ def _import_single_file(
     file_path: Path,
     database_id: str,
     options: ImportOptions,
+    verbose: bool = False,
 ) -> None:
     """Import a single Markdown file."""
-    click.echo(f"Importing {file_path}...")
+    logger = get_logger(__name__)
+
+    if verbose:
+        logger.info(f"Processing file: {file_path}")
+    else:
+        click.echo(f"Importing {file_path}...")
+
     result = service.import_file(
         file_path, database_id, options.mode, options.identifier, options.dry_run
     )
 
     if result.success:
-        click.echo(f"✅ {result.action}: {result.file_path}")
+        message = f"✅ {result.action}: {result.file_path}"
+        click.echo(message)
+        logger.info(
+            f"File import successful | action={result.action} | file={result.file_path}"
+        )
+
         if result.page_id:
             click.echo(f"   Page ID: {result.page_id}")
+            logger.debug(
+                f"Created/updated page | page_id={result.page_id} | "
+                f"file={result.file_path}"
+            )
     else:
-        click.echo(f"❌ Failed: {result.file_path}")
+        message = f"❌ Failed: {result.file_path}"
+        click.echo(message)
         click.echo(f"   Error: {result.error}")
+        logger.error(
+            f"File import failed | file={result.file_path} | error={result.error}"
+        )
 
 
 def _import_directory(
@@ -434,8 +475,15 @@ def _import_directory(
     directory_path: Path,
     database_id: str,
     options: ImportOptions,
+    verbose: bool = False,
 ) -> None:
     """Import all Markdown files from a directory."""
+    logger = get_logger(__name__)
+
+    logger.info(
+        f"Starting directory import | path={directory_path} | "
+        f"recursive={options.recursive}"
+    )
     click.echo(f"Importing from {directory_path}...")
     if options.recursive:
         click.echo("   (including subdirectories)")
@@ -443,15 +491,23 @@ def _import_directory(
     # Validate database schema with sample files
     sample_files = list(directory_path.glob("*.md"))[:5]
     if sample_files:
+        logger.debug(
+            f"Validating database schema with {len(sample_files)} sample files"
+        )
         _, warnings = service.validate_database_schema(database_id, sample_files)
         if warnings:
             click.echo("⚠️  Schema warnings:")
             for warning in warnings:
                 click.echo(f"   - {warning}")
+                logger.warning(f"Schema validation warning: {warning}")
             if not click.confirm("Continue anyway?"):
+                logger.info("Import cancelled by user due to schema warnings")
                 return
 
     # Import all files
+    logger.info(
+        f"Beginning batch import | mode={options.mode} | dry_run={options.dry_run}"
+    )
     result = service.import_directory(
         directory_path,
         database_id,
@@ -459,6 +515,12 @@ def _import_directory(
         options.mode,
         options.identifier,
         options.dry_run,
+    )
+
+    # Log summary
+    logger.info(
+        f"Directory import completed | total={result.total_files} | "
+        f"successful={result.successful} | failed={result.failed}"
     )
 
     # Display summary
@@ -473,6 +535,9 @@ def _import_directory(
         for r in result.results:
             if not r.success:
                 click.echo(f"   - {r.file_path}: {r.error}")
+                logger.error(
+                    f"Failed import details | file={r.file_path} | error={r.error}"
+                )
 
     # Show created/updated pages
     if not options.dry_run and result.successful > 0:
@@ -484,6 +549,10 @@ def _import_directory(
                     page_id_clean = r.page_id.replace("-", "")
                     notion_url = f"https://notion.so/{page_id_clean}"
                     click.echo(f"     {notion_url}")
+                    logger.debug(
+                        f"Successfully imported | action={r.action} | "
+                        f"file={r.file_path.name} | page_id={r.page_id}"
+                    )
 
 
 @cli.command("import")
@@ -563,9 +632,9 @@ def import_command(  # noqa: PLR0913
 
     try:
         if import_path.is_file():
-            _import_single_file(service, import_path, database_id, options)
+            _import_single_file(service, import_path, database_id, options, ctx.verbose)
         else:
-            _import_directory(service, import_path, database_id, options)
+            _import_directory(service, import_path, database_id, options, ctx.verbose)
 
     except Exception as e:
         click.echo(f"❌ Import failed: {e!s}", err=True)

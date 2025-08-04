@@ -1,10 +1,18 @@
 """Markdown import service for importing Markdown files to Notion."""
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from thought.client import NotionAPIClient
+from thought.logging_utils import (
+    get_logger,
+    log_dry_run_action,
+    log_operation_complete,
+    log_operation_start,
+    log_progress,
+)
 from thought.markdown_parser import MarkdownParser, ParsedMarkdown
 from thought.notion_converter import NotionBlockConverter
 from thought.service import GenericService
@@ -56,6 +64,7 @@ class MarkdownImportService(GenericService):
     client: NotionAPIClient = field(default_factory=NotionAPIClient)
     parser: MarkdownParser = field(default_factory=MarkdownParser)
     converter: NotionBlockConverter = field(default_factory=NotionBlockConverter)
+    logger: Any = field(default_factory=lambda: get_logger(__name__), init=False)
 
     def import_file(
         self,
@@ -66,36 +75,124 @@ class MarkdownImportService(GenericService):
         dry_run: bool = False,
     ) -> ImportResult:
         """Import a single Markdown file to Notion."""
+        start_time = time.time()
+
+        log_operation_start(
+            self.logger,
+            "file import",
+            file=str(file_path),
+            database_id=database_id,
+            mode=mode,
+            identifier=identifier,
+            dry_run=dry_run,
+        )
+
         try:
             # Parse the Markdown file
+            self.logger.debug(f"Parsing markdown file | file={file_path}")
             parsed = self.parser.parse_file(file_path)
+            self.logger.debug(
+                f"Parsed markdown | title={parsed.title} | "
+                f"frontmatter_keys={list(parsed.frontmatter.keys())}"
+            )
 
             # Find existing page if updating
+            self.logger.debug(
+                f"Looking for existing page | identifier_strategy={identifier}"
+            )
             existing_page = self._find_existing_page(parsed, database_id, identifier)
+
+            if existing_page:
+                self.logger.info(
+                    f"Found existing page | page_id={existing_page['id']} | "
+                    f"file={file_path}"
+                )
+            else:
+                self.logger.debug(f"No existing page found | file={file_path}")
 
             if dry_run:
                 action = "update" if existing_page else "create"
+                page_id = existing_page["id"] if existing_page else None
+
+                # Log detailed dry-run information
+                if existing_page:
+                    log_dry_run_action(
+                        self.logger,
+                        f"{action} page",
+                        f"page_id={page_id}",
+                        {"file": str(file_path), "mode": mode, "title": parsed.title},
+                    )
+                else:
+                    log_dry_run_action(
+                        self.logger,
+                        f"{action} page",
+                        f"in database {database_id}",
+                        {
+                            "file": str(file_path),
+                            "title": parsed.title,
+                            "properties": len(parsed.frontmatter),
+                        },
+                    )
+
+                duration = time.time() - start_time
+                log_operation_complete(
+                    self.logger,
+                    "file import (dry-run)",
+                    duration,
+                    action=f"would {action}",
+                )
+
                 return ImportResult(
                     file_path=file_path,
                     success=True,
-                    page_id=existing_page["id"] if existing_page else None,
+                    page_id=page_id,
                     action=f"would {action}",
                 )
 
             if existing_page:
                 # Update existing page
+                self.logger.info(
+                    f"Updating existing page | page_id={existing_page['id']} | "
+                    f"mode={mode}"
+                )
                 page_id = self._update_page(existing_page["id"], parsed, mode)
+
+                duration = time.time() - start_time
+                log_operation_complete(
+                    self.logger,
+                    "file import",
+                    duration,
+                    action="updated",
+                    page_id=page_id,
+                )
+
                 return ImportResult(
                     file_path=file_path, success=True, page_id=page_id, action="updated"
                 )
             else:
                 # Create new page
+                self.logger.info(f"Creating new page | database_id={database_id}")
                 page_id = self._create_page(database_id, parsed)
+
+                duration = time.time() - start_time
+                log_operation_complete(
+                    self.logger,
+                    "file import",
+                    duration,
+                    action="created",
+                    page_id=page_id,
+                )
+
                 return ImportResult(
                     file_path=file_path, success=True, page_id=page_id, action="created"
                 )
 
         except Exception as e:
+            duration = time.time() - start_time
+            self.logger.error(
+                f"File import failed | file={file_path} | "
+                f"error={e} | duration={duration:.3f}s"
+            )
             return ImportResult(file_path=file_path, success=False, error=str(e))
 
     def import_directory(  # noqa: PLR0913
@@ -109,6 +206,8 @@ class MarkdownImportService(GenericService):
         pattern: str = "*.md",
     ) -> BatchImportResult:
         """Import all Markdown files from a directory."""
+        start_time = time.time()
+
         # Create options object
         options = DirectoryImportOptions(
             directory_path=directory_path,
@@ -120,14 +219,38 @@ class MarkdownImportService(GenericService):
             pattern=pattern,
         )
 
+        log_operation_start(
+            self.logger,
+            "directory import",
+            directory=str(directory_path),
+            recursive=recursive,
+            pattern=pattern,
+            mode=mode,
+            dry_run=dry_run,
+        )
+
         # Find all Markdown files
+        self.logger.debug(
+            f"Scanning for files | pattern={pattern} | recursive={recursive}"
+        )
         if options.recursive:
             files = list(options.directory_path.rglob(options.pattern))
         else:
             files = list(options.directory_path.glob(options.pattern))
 
+        self.logger.info(
+            f"Found {len(files)} files to import | directory={directory_path}"
+        )
+
         results = []
-        for file_path in files:
+        for i, file_path in enumerate(files, 1):
+            # Log progress for large batches
+            large_batch_threshold = 5
+            if len(files) > large_batch_threshold:
+                log_progress(
+                    self.logger, i, len(files), "importing files", str(file_path.name)
+                )
+
             result = self.import_file(
                 file_path,
                 options.database_id,
@@ -140,6 +263,16 @@ class MarkdownImportService(GenericService):
         # Calculate summary
         successful = sum(1 for r in results if r.success)
         failed = len(results) - successful
+
+        duration = time.time() - start_time
+        log_operation_complete(
+            self.logger,
+            "directory import",
+            duration,
+            total_files=len(results),
+            successful=successful,
+            failed=failed,
+        )
 
         return BatchImportResult(
             total_files=len(results),
@@ -304,7 +437,9 @@ class MarkdownImportService(GenericService):
                 if user:
                     user_ids.append(user["id"])
                 else:
-                    print(f"Warning: User '{assignee}' not found in workspace")
+                    self.logger.warning(
+                        f"User not found in workspace | assignee={assignee}"
+                    )
             return user_ids if user_ids else None
         else:
             # Single assignee
@@ -312,7 +447,9 @@ class MarkdownImportService(GenericService):
             if user:
                 return user["id"]
             else:
-                print(f"Warning: User '{assignee_value}' not found in workspace")
+                self.logger.warning(
+                    f"User not found in workspace | assignee={assignee_value}"
+                )
                 return None
 
     def _create_page(self, database_id: str, parsed: ParsedMarkdown) -> str:
@@ -400,7 +537,9 @@ class MarkdownImportService(GenericService):
                 self.client.client.pages.update(page_id=page_id, properties=properties)
             except Exception as e:
                 # Log the error but continue with content update
-                print(f"Warning: Failed to update properties: {e}")
+                self.logger.warning(
+                    f"Failed to update page properties | error={e} | page_id={page_id}"
+                )
 
         # Handle content update based on mode
         if mode == "replace":
