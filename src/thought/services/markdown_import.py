@@ -333,7 +333,70 @@ class MarkdownImportService(GenericService):
 
         return valid_properties
 
-    def _convert_properties_with_schema(  # noqa: PLR0912
+    def _convert_property_value(  # noqa: PLR0911, PLR0912
+        self, prop_type: str, value: Any, actual_prop_name: str
+    ) -> dict[str, Any] | None:
+        """Convert a single property value based on its type."""
+        if prop_type == "select":
+            return {actual_prop_name: {"select": {"name": str(value)}}}
+        elif prop_type == "status":
+            return {actual_prop_name: {"status": {"name": str(value)}}}
+        elif prop_type == "multi_select":
+            if isinstance(value, list):
+                return {
+                    actual_prop_name: {
+                        "multi_select": [{"name": str(item)} for item in value]
+                    }
+                }
+            else:
+                return {actual_prop_name: {"multi_select": [{"name": str(value)}]}}
+        elif prop_type == "checkbox":
+            return {actual_prop_name: {"checkbox": bool(value)}}
+        elif prop_type == "number":
+            return {actual_prop_name: {"number": float(value) if value else None}}
+        elif prop_type == "date":
+            if isinstance(value, str):
+                return {actual_prop_name: {"date": {"start": value}}}
+            else:
+                # Handle datetime objects from frontmatter
+                return {actual_prop_name: {"date": {"start": str(value)}}}
+        elif prop_type in ["title", "rich_text"]:
+            return {actual_prop_name: {prop_type: [{"text": {"content": str(value)}}]}}
+        elif prop_type == "people":
+            # Handle people/user assignments - value should be user ID(s)
+            if isinstance(value, list):
+                # Multiple assignees
+                return {
+                    actual_prop_name: {
+                        "people": [
+                            {"object": "user", "id": str(user_id)}
+                            for user_id in value
+                            if user_id
+                        ]
+                    }
+                }
+            # Single assignee
+            elif value:
+                return {
+                    actual_prop_name: {"people": [{"object": "user", "id": str(value)}]}
+                }
+        elif prop_type == "relation":
+            # Handle relation properties - value should be page ID(s)
+            if isinstance(value, list):
+                # Multiple related pages
+                return {
+                    actual_prop_name: {
+                        "relation": [
+                            {"id": str(page_id)} for page_id in value if page_id
+                        ]
+                    }
+                }
+            # Single related page
+            elif value:
+                return {actual_prop_name: {"relation": [{"id": str(value)}]}}
+        return None
+
+    def _convert_properties_with_schema(
         self, frontmatter: dict[str, Any], db_properties: dict[str, dict[str, Any]]
     ) -> dict[str, Any]:
         """Convert frontmatter to Notion properties using database schema."""
@@ -372,53 +435,17 @@ class MarkdownImportService(GenericService):
                     continue  # Skip if user not found
                 value = resolved_value
 
+            # Special handling for project fields
+            if key.lower() in ["project", "projects"] and prop_type == "relation":
+                resolved_value = self._resolve_project_to_page_id(original_value)
+                if not resolved_value:
+                    continue  # Skip if project not found
+                value = resolved_value
+
             # Convert value based on property type
-            if prop_type == "select":
-                properties[actual_prop_name] = {"select": {"name": str(value)}}
-            elif prop_type == "status":
-                properties[actual_prop_name] = {"status": {"name": str(value)}}
-            elif prop_type == "multi_select":
-                if isinstance(value, list):
-                    properties[actual_prop_name] = {
-                        "multi_select": [{"name": str(item)} for item in value]
-                    }
-                else:
-                    properties[actual_prop_name] = {
-                        "multi_select": [{"name": str(value)}]
-                    }
-            elif prop_type == "checkbox":
-                properties[actual_prop_name] = {"checkbox": bool(value)}
-            elif prop_type == "number":
-                properties[actual_prop_name] = {
-                    "number": float(value) if value else None
-                }
-            elif prop_type == "date":
-                if isinstance(value, str):
-                    properties[actual_prop_name] = {"date": {"start": value}}
-                else:
-                    # Handle datetime objects from frontmatter
-                    properties[actual_prop_name] = {"date": {"start": str(value)}}
-            elif prop_type in ["title", "rich_text"]:
-                properties[actual_prop_name] = {
-                    prop_type: [{"text": {"content": str(value)}}]
-                }
-            elif prop_type == "people":
-                # Handle people/user assignments - value should be user ID(s)
-                if isinstance(value, list):
-                    # Multiple assignees
-                    properties[actual_prop_name] = {
-                        "people": [
-                            {"object": "user", "id": str(user_id)}
-                            for user_id in value
-                            if user_id
-                        ]
-                    }
-                # Single assignee
-                elif value:
-                    properties[actual_prop_name] = {
-                        "people": [{"object": "user", "id": str(value)}]
-                    }
-            # Add more property types as needed
+            prop_dict = self._convert_property_value(prop_type, value, actual_prop_name)
+            if prop_dict:
+                properties.update(prop_dict)
 
         return properties
 
@@ -449,6 +476,34 @@ class MarkdownImportService(GenericService):
             else:
                 self.logger.warning(
                     f"User not found in workspace | assignee={assignee_value}"
+                )
+                return None
+
+    def _resolve_project_to_page_id(self, project_value: Any) -> str | list[str] | None:
+        """Resolve project name to Notion page ID(s)."""
+        if not project_value:
+            return None
+
+        if isinstance(project_value, list):
+            # Multiple projects
+            page_ids = []
+            for project in project_value:
+                page = self.client.find_project_by_name(str(project))
+                if page:
+                    page_ids.append(page["id"])
+                else:
+                    self.logger.warning(
+                        f"Project not found in workspace | project={project}"
+                    )
+            return page_ids if page_ids else None
+        else:
+            # Single project
+            page = self.client.find_project_by_name(str(project_value))
+            if page:
+                return page["id"]
+            else:
+                self.logger.warning(
+                    f"Project not found in workspace | project={project_value}"
                 )
                 return None
 

@@ -268,3 +268,127 @@ class TestNotionAPIClient:
         # Test lookup with non-existent user
         user = client.get_user_by_name_or_email("Unknown User")
         assert user is None
+
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
+    @patch("thought.client.NotionClient")
+    def test_search_pages(mock_notion_client):
+        """
+        Test searching for pages and databases in the workspace
+        """
+        # Setup mock
+        mock_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_client_instance
+        mock_client_instance.search.return_value = {
+            "results": [
+                {
+                    "id": "page1",
+                    "object": "page",
+                    "properties": {
+                        "title": {
+                            "type": "title",
+                            "title": [
+                                {"type": "text", "text": {"content": "Project Alpha"}}
+                            ],
+                        }
+                    },
+                },
+                {
+                    "id": "db1",
+                    "object": "database",
+                    "properties": {
+                        "title": {
+                            "type": "title",
+                            "title": [
+                                {"type": "text", "text": {"content": "Tasks Database"}}
+                            ],
+                        }
+                    },
+                },
+            ]
+        }
+
+        # Create client and test search
+        client = NotionAPIClient()
+
+        # Test search with query
+        results = client.search_pages(query="Project")
+        expected_result_count = 2
+        assert len(results) == expected_result_count
+        mock_client_instance.search.assert_called_with(query="Project")
+
+        # Test search with filter
+        results = client.search_pages(filter_type="page")
+        mock_client_instance.search.assert_called_with(
+            filter={"value": "page", "property": "object"}
+        )
+
+        # Test search with both query and filter
+        results = client.search_pages(query="Tasks", filter_type="database")
+        mock_client_instance.search.assert_called_with(
+            query="Tasks", filter={"value": "database", "property": "object"}
+        )
+
+    @staticmethod
+    @patch("thought.client.NOTION_ACCESS_TOKEN", "mocked_token")
+    @patch("thought.client.NotionClient")
+    def test_find_project_by_name(mock_notion_client):
+        """
+        Test finding a project by name
+        """
+        # Setup mock
+        mock_client_instance = MagicMock()
+        mock_notion_client.return_value = mock_client_instance
+        mock_client_instance.search.return_value = {
+            "results": [
+                {
+                    "id": "proj1",
+                    "object": "page",
+                    "properties": {
+                        "Title": {
+                            "type": "title",
+                            "title": [
+                                {
+                                    "type": "text",
+                                    "text": {"content": "Website Redesign"},
+                                }
+                            ],
+                        }
+                    },
+                },
+                {
+                    "id": "proj2",
+                    "object": "page",
+                    "properties": {
+                        "Name": {
+                            "type": "title",
+                            "title": [
+                                {"type": "text", "text": {"content": "Mobile App"}}
+                            ],
+                        }
+                    },
+                },
+            ]
+        }
+
+        # Create client and test project lookup
+        client = NotionAPIClient()
+
+        # Test exact match
+        project = client.find_project_by_name("Website Redesign")
+        assert project is not None
+        assert project["id"] == "proj1"
+
+        # Test case-insensitive match
+        project = client.find_project_by_name("WEBSITE REDESIGN")
+        assert project is not None
+        assert project["id"] == "proj1"
+
+        # Test partial match
+        project = client.find_project_by_name("Mobile")
+        assert project is not None
+        assert project["id"] == "proj2"
+
+        # Test non-existent project
+        project = client.find_project_by_name("Unknown Project")
+        assert project is None

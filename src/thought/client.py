@@ -185,3 +185,127 @@ class NotionAPIClient:
 
         self.logger.warning(f"User not found | identifier={identifier}")
         return None
+
+    def search_pages(
+        self, query: str | None = None, filter_type: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Search for pages and databases in the workspace
+
+        Args:
+            query: Text to search for in page/database titles
+            filter_type: Optional filter - "page" or "database"
+
+        Returns:
+            List of pages/databases matching the search criteria
+        """
+        assert self.client is not None
+
+        start_time = time.time()
+
+        try:
+            search_params: dict[str, Any] = {}
+            if query:
+                search_params["query"] = query
+            if filter_type:
+                search_params["filter"] = {"value": filter_type, "property": "object"}
+
+            self.logger.debug(
+                f"Searching pages/databases | query={query} | filter={filter_type}"
+            )
+
+            response = self.client.search(**search_params)
+            results = response.get("results", [])
+
+            duration = time.time() - start_time
+            self.logger.info(
+                f"Search completed | query={query} | filter={filter_type} | "
+                f"results={len(results)} | duration={duration:.3f}s"
+            )
+            log_api_call(
+                self.logger,
+                "POST",
+                "search",
+                params=search_params,
+                response_status=200,
+                duration=duration,
+            )
+
+            return results
+
+        except Exception as e:
+            duration = time.time() - start_time
+            self.logger.error(
+                f"Search failed | query={query} | filter={filter_type} | "
+                f"error={e} | duration={duration:.3f}s"
+            )
+            log_api_call(
+                self.logger,
+                "POST",
+                "search",
+                params={"query": query, "filter": filter_type},
+                response_status=None,
+                duration=duration,
+            )
+            raise
+
+    def _extract_title_text(self, result: dict[str, Any]) -> str:
+        """Extract title text from a Notion result object."""
+        properties = result.get("properties", {})
+
+        # Find title property
+        title_prop = None
+        for _prop_name, prop_value in properties.items():
+            if prop_value.get("type") == "title":
+                title_prop = prop_value
+                break
+
+        if not title_prop or not title_prop.get("title"):
+            return ""
+
+        # Extract text content
+        title_text = ""
+        for text_block in title_prop["title"]:
+            if text_block.get("type") == "text":
+                title_text += text_block.get("text", {}).get("content", "")
+
+        return title_text
+
+    def find_project_by_name(self, project_name: str) -> dict[str, Any] | None:
+        """
+        Find a project (page or database) by its name/title
+
+        Args:
+            project_name: The name of the project to find
+
+        Returns:
+            The first matching page/database or None if not found
+        """
+        self.logger.debug(f"Looking for project | name={project_name}")
+
+        # Search for pages and databases with the project name
+        results = self.search_pages(query=project_name)
+        project_name_lower = project_name.lower()
+
+        # Try exact match first (case-insensitive)
+        for result in results:
+            title_text = self._extract_title_text(result)
+            if title_text.lower() == project_name_lower:
+                self.logger.debug(
+                    f"Project found (exact match) | name={project_name} | "
+                    f"id={result.get('id')} | type={result.get('object')}"
+                )
+                return result
+
+        # If no exact match, try partial match
+        for result in results:
+            title_text = self._extract_title_text(result)
+            if project_name_lower in title_text.lower():
+                self.logger.debug(
+                    f"Project found (partial match) | name={project_name} | "
+                    f"id={result.get('id')} | type={result.get('object')}"
+                )
+                return result
+
+        self.logger.warning(f"Project not found | name={project_name}")
+        return None

@@ -49,6 +49,8 @@ export INSTAPAPER_PASS="your_password"
   * Multiple merge strategies (merge, replace, skip)
   * Dry-run mode for previewing changes
   * Full Markdown syntax support with rich text formatting
+  * Project linking via relation properties
+  * Automatic user assignment resolution
 
 * **Service Integration**
   * Sync data from Instapaper to Notion collections
@@ -147,6 +149,8 @@ tags:
 priority: 5
 completed: false
 due_date: 2024-12-31
+assignee: john@example.com
+project: Website Redesign
 notion_id: optional-page-id-for-updates
 ---
 
@@ -159,6 +163,7 @@ Content with **bold**, *italic*, `code`, and [links](https://example.com).
 - Bullet lists
 - Code blocks with syntax highlighting
 - Tables and quotes
+- [ ] Checkboxes that convert to Notion to-do blocks
 ```
 
 #### Import Options
@@ -174,6 +179,35 @@ Content with **bold**, *italic*, `code`, and [links](https://example.com).
   * `id`: Match by notion_id in frontmatter
   * `title`: Match by title
 * **--dry-run**: Preview changes without applying them
+
+#### Special Property Handling
+
+The import feature automatically handles certain property types with special processing:
+
+##### User Assignment (People Properties)
+When your database has a "people" property type and your frontmatter includes `assignee` or `assigned_to`:
+- The tool automatically looks up users by name or email
+- Supports single assignee: `assignee: john@example.com`
+- Supports multiple assignees: `assignee: ["john@example.com", "jane@example.com"]`
+- Users not found in the workspace are skipped with a warning
+
+##### Project Linking (Relation Properties)
+When your database has a "relation" property type and your frontmatter includes `project` or `projects`:
+- The tool automatically searches for matching pages/databases by name
+- Supports single project: `project: Website Redesign`
+- Supports multiple projects: `projects: ["Project Alpha", "Project Beta"]`
+- Uses case-insensitive matching with exact match preference
+- Projects not found are skipped with a warning
+
+##### Property Type Conversions
+The tool automatically converts frontmatter values to appropriate Notion property types:
+- **Text/Title**: String values → Rich text
+- **Number**: Numeric values → Number property
+- **Checkbox**: Boolean values → Checkbox property
+- **Select/Status**: String values → Select/Status options
+- **Multi-select**: Arrays → Multi-select options
+- **Date**: Date strings → Date property
+- **Tags**: Arrays → Multi-select (if property name is "Tags")
 
 ### Service Integration
 
@@ -311,6 +345,22 @@ thought import ./docs --database "..." --recursive
 ```bash
 # Update by ID with content replacement
 thought import ticket.md --database "..." --identifier id --mode replace
+```
+
+#### Import tickets with project assignments
+
+```bash
+# Import tickets that link to projects via relation properties
+thought import tickets/ --database "..." --recursive
+
+# Example ticket frontmatter:
+# ---
+# title: Fix authentication bug
+# status: In Progress
+# assignee: developer@company.com
+# project: Website Redesign
+# tags: [bug, high-priority]
+# ---
 ```
 
 #### Import with specific properties only

@@ -9,6 +9,7 @@ Thought is a Notion CLI tool built with Python that provides database management
 ## Development Commands
 
 ### Testing
+
 ```bash
 # Run all tests with coverage
 pytest
@@ -21,6 +22,7 @@ pytest -v
 ```
 
 ### Code Quality
+
 ```bash
 # Check code with ruff linter
 ruff check .
@@ -33,6 +35,7 @@ pre-commit run --all-files
 ```
 
 ### Installation & Setup
+
 ```bash
 # Install in development mode
 uv pip install -e ".[dev]"
@@ -42,6 +45,7 @@ uv pip install -e .
 ```
 
 ### CLI Usage
+
 ```bash
 # Main CLI entry point
 thought --help
@@ -98,6 +102,7 @@ thought import ./docs/ --database "https://notion.so/your-database-url" --dry-ru
 ### Service Integration
 
 Services are registered in `settings.SERVICES_REGISTERED` and must:
+
 - Inherit from `GenericService` or `APIService`
 - Implement required methods (e.g., `authorize()` for API services)
 - Be placed in `src/thought/services/` directory
@@ -106,13 +111,15 @@ Services are registered in `settings.SERVICES_REGISTERED` and must:
 ### Environment Variables
 
 Required for operation:
+
 - `NOTION_ACCESS_TOKEN`: Notion integration token
 - `INSTAPAPER_CONSUMER_ID`, `INSTAPAPER_CONSUMER_SECRET`: For Instapaper sync
 - `INSTAPAPER_USER`, `INSTAPAPER_PASS`: Instapaper credentials
 
-## Testing
+## Testing Environment
 
 Uses pytest with fixtures defined in `conftest.py`. Key test patterns:
+
 - `notion_api_client` fixture provides NotionAPIClient instance
 - Tests focus on client initialization and API interaction
 - Coverage reporting enabled with `--cov=thought`
@@ -124,3 +131,8 @@ Uses pytest with fixtures defined in `conftest.py`. Key test patterns:
 - Double quotes for strings
 - Space indentation
 - Pre-commit hooks enforce quality standards
+
+## Development Workflow
+
+- Memory reminders:
+  - Make sure to always update the README.md at the end of building a new feature
