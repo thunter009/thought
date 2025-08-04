@@ -27,15 +27,18 @@ class TestNotionBlockConverter:
 
     def test_markdown_line_wrapping(self, converter):
         """Test that softbreaks (line wrapping) are converted to spaces while linebreaks are preserved."""
-        markdown = """This is a long line that has been wrapped
-for markdown linting compliance but should be
-a single paragraph in Notion.
-
-This is an intentional
-line break that should be preserved.
-
-Another paragraph with wrapped lines
-that should flow together."""
+        # Use string concatenation to preserve trailing spaces that create hard linebreaks
+        markdown = (
+            "This is a long line that has been wrapped\n"
+            "for markdown linting compliance but should be\n"
+            "a single paragraph in Notion.\n"
+            "\n"
+            "This is an intentional  \n"  # Two trailing spaces for hard linebreak
+            "line break that should be preserved.\n"
+            "\n"
+            "Another paragraph with wrapped lines\n"
+            "that should flow together."
+        )
 
         blocks = converter.markdown_to_blocks(markdown)
 
