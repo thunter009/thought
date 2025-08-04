@@ -13,6 +13,7 @@ EXPECTED_TABLE_WIDTH = 2
 EXPECTED_TABLE_ROW_COUNT = 3  # Header + 2 data rows
 EXPECTED_CHECKBOX_BLOCKS = 6
 EXPECTED_BOLD_RICH_TEXT_PARTS = 3  # "Task with ", "bold", " text"
+EXPECTED_LINE_WRAPPING_PARAGRAPHS = 3
 
 
 @pytest.fixture
@@ -23,6 +24,41 @@ def converter():
 
 class TestNotionBlockConverter:
     """Test NotionBlockConverter functionality."""
+
+    def test_markdown_line_wrapping(self, converter):
+        """Test that softbreaks (line wrapping) are converted to spaces while linebreaks are preserved."""
+        markdown = """This is a long line that has been wrapped
+for markdown linting compliance but should be
+a single paragraph in Notion.
+
+This is an intentional  
+line break that should be preserved.
+
+Another paragraph with wrapped lines
+that should flow together."""
+
+        blocks = converter.markdown_to_blocks(markdown)
+
+        # Should have 3 paragraphs
+        assert len(blocks) == EXPECTED_LINE_WRAPPING_PARAGRAPHS
+        assert all(block["type"] == "paragraph" for block in blocks)
+
+        # First paragraph: wrapped lines should be joined with spaces
+        first_rich_text = blocks[0]["paragraph"]["rich_text"]
+        first_text = "".join(rt["text"]["content"] for rt in first_rich_text)
+        expected_first = "This is a long line that has been wrapped for markdown linting compliance but should be a single paragraph in Notion."
+        assert first_text == expected_first
+
+        # Second paragraph: intentional line break should be preserved
+        second_rich_text = blocks[1]["paragraph"]["rich_text"]
+        second_text = "".join(rt["text"]["content"] for rt in second_rich_text)
+        assert "intentional\nline break" in second_text
+
+        # Third paragraph: wrapped lines should be joined
+        third_rich_text = blocks[2]["paragraph"]["rich_text"]
+        third_text = "".join(rt["text"]["content"] for rt in third_rich_text)
+        expected_third = "Another paragraph with wrapped lines that should flow together."
+        assert third_text == expected_third
 
     def test_convert_heading(self, converter):
         """Test heading conversion."""
