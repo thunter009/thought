@@ -31,7 +31,7 @@ class TestNotionBlockConverter:
 for markdown linting compliance but should be
 a single paragraph in Notion.
 
-This is an intentional  
+This is an intentional
 line break that should be preserved.
 
 Another paragraph with wrapped lines
@@ -57,7 +57,9 @@ that should flow together."""
         # Third paragraph: wrapped lines should be joined
         third_rich_text = blocks[2]["paragraph"]["rich_text"]
         third_text = "".join(rt["text"]["content"] for rt in third_rich_text)
-        expected_third = "Another paragraph with wrapped lines that should flow together."
+        expected_third = (
+            "Another paragraph with wrapped lines that should flow together."
+        )
         assert third_text == expected_third
 
     def test_convert_heading(self, converter):
