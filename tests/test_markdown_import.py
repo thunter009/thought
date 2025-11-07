@@ -833,3 +833,150 @@ class TestMarkdownImportServiceLogging:
 
         # Should return empty list since all users not found
         assert result is None or result == []
+
+    def test_project_resolution(self, import_service):
+        """Test that project names are resolved to page IDs."""
+        # Mock find_project_by_name to return a project
+        import_service.client.find_project_by_name.return_value = {
+            "id": "proj-123",
+            "object": "page",
+            "properties": {
+                "Title": {
+                    "type": "title",
+                    "title": [
+                        {"type": "text", "text": {"content": "Website Redesign"}}
+                    ],
+                }
+            },
+        }
+
+        # Test single project resolution
+        result = import_service._resolve_project_to_page_id("Website Redesign")
+        assert result == "proj-123"
+        import_service.client.find_project_by_name.assert_called_with(
+            "Website Redesign"
+        )
+
+        # Test multiple projects resolution
+        import_service.client.find_project_by_name.side_effect = [
+            {"id": "proj-1", "object": "page"},
+            {"id": "proj-2", "object": "page"},
+        ]
+
+        result = import_service._resolve_project_to_page_id(["Project A", "Project B"])
+        assert result == ["proj-1", "proj-2"]
+
+        # Test project not found - reset side_effect and use return_value
+        import_service.client.find_project_by_name.side_effect = None
+        import_service.client.find_project_by_name.return_value = None
+        result = import_service._resolve_project_to_page_id("Unknown Project")
+        assert result is None
+
+    def test_relation_property_conversion(self, import_service, sample_parsed_markdown):
+        """Test that relation properties are correctly converted."""
+        sample_parsed_markdown.frontmatter = {
+            "title": "Test Task",
+            "project": "Website Redesign",
+        }
+
+        # Mock database with relation property
+        import_service.client.client.databases.retrieve = MagicMock(
+            return_value={
+                "properties": {
+                    "Title": {"type": "title"},
+                    "Project": {"type": "relation"},
+                }
+            }
+        )
+
+        # Mock project resolution
+        import_service.client.find_project_by_name.return_value = {
+            "id": "proj-123",
+            "object": "page",
+        }
+
+        import_service.client.client.pages.create = MagicMock(
+            return_value={"id": "new-page-123"}
+        )
+
+        import_service._create_page("db-123", sample_parsed_markdown)
+
+        # Verify relation property was set correctly
+        call_args = import_service.client.client.pages.create.call_args
+        properties = call_args[1]["properties"]
+
+        assert "Title" in properties
+        assert "Project" in properties
+        assert properties["Project"]["relation"] == [{"id": "proj-123"}]
+
+    def test_multiple_projects_relation(self, import_service, sample_parsed_markdown):
+        """Test handling multiple projects in a relation field."""
+        sample_parsed_markdown.frontmatter = {
+            "title": "Multi-Project Task",
+            "projects": ["Project Alpha", "Project Beta"],
+        }
+
+        # Mock database with relation property
+        import_service.client.client.databases.retrieve = MagicMock(
+            return_value={
+                "properties": {
+                    "Title": {"type": "title"},
+                    "Projects": {"type": "relation"},
+                }
+            }
+        )
+
+        # Mock project resolution for multiple projects
+        import_service.client.find_project_by_name.side_effect = [
+            {"id": "proj-alpha", "object": "page"},
+            {"id": "proj-beta", "object": "page"},
+        ]
+
+        import_service.client.client.pages.create = MagicMock(
+            return_value={"id": "new-page-123"}
+        )
+
+        import_service._create_page("db-123", sample_parsed_markdown)
+
+        # Verify relation property was set correctly with multiple projects
+        call_args = import_service.client.client.pages.create.call_args
+        properties = call_args[1]["properties"]
+
+        assert "Projects" in properties
+        assert properties["Projects"]["relation"] == [
+            {"id": "proj-alpha"},
+            {"id": "proj-beta"},
+        ]
+
+    def test_project_not_found_skipped(self, import_service, sample_parsed_markdown):
+        """Test that properties are skipped when project is not found."""
+        sample_parsed_markdown.frontmatter = {
+            "title": "Task with Missing Project",
+            "project": "Non-Existent Project",
+        }
+
+        # Mock database with relation property
+        import_service.client.client.databases.retrieve = MagicMock(
+            return_value={
+                "properties": {
+                    "Title": {"type": "title"},
+                    "Project": {"type": "relation"},
+                }
+            }
+        )
+
+        # Mock project not found
+        import_service.client.find_project_by_name.return_value = None
+
+        import_service.client.client.pages.create = MagicMock(
+            return_value={"id": "new-page-123"}
+        )
+
+        import_service._create_page("db-123", sample_parsed_markdown)
+
+        # Verify project property was skipped
+        call_args = import_service.client.client.pages.create.call_args
+        properties = call_args[1]["properties"]
+
+        assert "Title" in properties
+        assert "Project" not in properties  # Should be skipped since project not found
